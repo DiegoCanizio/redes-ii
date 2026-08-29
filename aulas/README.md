@@ -1,16 +1,19 @@
 # Aulas — Material dos Estudantes
 
-Esta pasta contém os tutoriais e arquivos que poderão ser publicados no repositório público `redes-ii`.
+Esta pasta contém os tutoriais e arquivos que serão utilizados em sala e estão públicos no repositório público `redes-ii`.
 
-Estrutura prevista:
+Estrutura:
 
 ```text
+arquivos/
+   aula-xx
+      arquivo.xxx
 aula-01/
   tutorial.md
-  arquivos/
+
 ```
 
-Antes de publicar qualquer conteúdo, verificar se não há:
+Aqui não há:
 
 - soluções;
 - respostas de avaliações;
