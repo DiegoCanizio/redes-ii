@@ -23,7 +23,7 @@ Você consulta esse repositório para obter:
 > **Você não fará `push` nesse repositório.**
 
 ### Seu portfólio
-
+Acesse pelo link: https://classroom50.org/diego-canizio-edu/redes-ii-2026-2/assignments/portfolio-redes-ii-template/accept
 Será criado individualmente para você por meio do Classroom 50.
 
 É nele que você fará:
