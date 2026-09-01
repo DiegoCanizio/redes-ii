@@ -23,8 +23,19 @@ Você consulta esse repositório para obter:
 > **Você não fará `push` nesse repositório.**
 
 ### Seu portfólio
-Acesse pelo link: https://classroom50.org/diego-canizio-edu/redes-ii-2026-2/assignments/portfolio-redes-ii-template/accept
-Será criado individualmente para você por meio do Classroom 50.
+
+O professor adicionará você ao **roster da turma no Classroom 50**.
+
+Após isso:
+
+1. você receberá um convite do GitHub para entrar na organização `diego-canizio-edu`;
+2. aceite esse convite;
+3. acesse o Classroom 50;
+4. o assignment **Portfólio Redes II** aparecerá para você;
+5. aceite o assignment;
+6. aguarde a criação do seu repositório individual.
+
+Esse repositório será utilizado durante todo o semestre.
 
 É nele que você fará:
 
@@ -45,7 +56,8 @@ Ao final desta aula você deverá conseguir:
 
 - distinguir Git de GitHub;
 - distinguir o repositório da disciplina do seu repositório individual;
-- aceitar a atividade `Portfólio Redes II`;
+- aceitar o convite para a organização GitHub da turma;
+- aceitar o assignment `Portfólio Redes II` no Classroom 50;
 - instalar Git e GitHub CLI;
 - autenticar sua VM no GitHub;
 - clonar seu repositório individual;
@@ -55,22 +67,29 @@ Ao final desta aula você deverá conseguir:
 
 ---
 
-# Parte 1 — Aceite seu portfólio
+# Parte 1 — Entre na organização e aceite seu portfólio
 
-O professor fornecerá um link do Classroom 50:
+Antes desta etapa, o professor deverá ter adicionado você ao **roster da turma no Classroom 50**.
+
+## 1. Aceite o convite da organização
+
+Verifique o e-mail associado à sua conta GitHub.
+
+Você deverá receber um convite do GitHub para entrar na organização:
 
 ```text
-[LINK_CLASSROOM50_PORTFOLIO]
+diego-canizio-edu
 ```
 
 No navegador do Windows:
 
-1. abra o link;
+1. abra o link que recebeu no email cadastrado;
 2. entre na sua conta GitHub (Se não tiver, eis uma boa hora para criar);
-3. autorize o Classroom 50 se for solicitado;
-4. aceite a atividade;
-5. aguarde a criação/configuração do seu repositório;
-6. abra o repositório criado para você.
+3. Aceite o convite para a organização; 
+4. Entre no site do Classroom 50;
+5. aceite a atividade;
+6. aguarde a criação/configuração do seu repositório;
+7. abra o repositório criado para você.
 
 > Esse repositório será reutilizado durante todo o semestre.
 
