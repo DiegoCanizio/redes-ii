@@ -1,166 +1,81 @@
-# Aula 01 — Primeiros passos em Redes II e seu portfólio no GitHub
+# Aula 01 — Git, GitHub e início do portfólio
 
-## Situação-problema
+**Data:** 01/10/2026  
+**Duração realizada:** 150 minutos  
+**Situação:** aula realizada — roteiro consolidado posteriormente.
 
-Os computadores do laboratório são restaurados. Por isso, arquivos e configurações mantidos apenas na VM podem desaparecer.
+> Este material registra o que foi desenvolvido no encontro. Não cria uma nova atividade retroativa.
 
-Durante Redes de Computadores II, você terá um **repositório individual de portfólio** no GitHub. Ele armazenará configurações, documentação, scripts e evidências produzidos durante o semestre.
+---
 
-Existem dois repositórios que você precisa distinguir:
+## Objetivos trabalhados
 
-### Material da disciplina
+Ao longo da aula foram apresentados:
+
+- organização da disciplina;
+- repositório oficial de materiais;
+- portfólio individual no Classroom 50;
+- diferença entre Git e GitHub;
+- GitHub CLI (`gh`);
+- autenticação de uma máquina no GitHub;
+- clonagem do repositório individual;
+- fluxo `status → add → commit → push`.
+
+---
+
+# 1. Dois repositórios diferentes
+
+## Material da disciplina
 
 ```text
 https://github.com/DiegoCanizio/redes-ii
 ```
 
-Você consulta esse repositório para obter:
+É utilizado para consultar:
 
 - tutoriais;
 - materiais;
-- arquivos publicados pelo professor.
+- arquivos de apoio.
 
-> **Você não fará `push` nesse repositório.**
+Não é o destino dos commits do estudante.
 
-### Seu portfólio
+## Portfólio individual
 
-O professor adicionará você ao **roster da turma no Classroom 50**.
+Cada estudante recebeu um repositório individual por meio do Classroom 50.
 
-Após isso:
-
-1. você receberá um convite do GitHub para entrar na organização `diego-canizio-edu`;
-2. aceite esse convite;
-3. acesse o Classroom 50;
-4. o assignment **Portfólio Redes II** aparecerá para você;
-5. aceite o assignment;
-6. aguarde a criação do seu repositório individual.
-
-Esse repositório será utilizado durante todo o semestre.
-
-É nele que você fará:
-
-```text
-clone
-add
-commit
-push
-```
-
-durante o semestre.
+É nele que serão armazenados os trabalhos produzidos ao longo do semestre.
 
 ---
 
-## Objetivos
+# 2. Git e GitHub
 
-Ao final desta aula você deverá conseguir:
+De forma simplificada:
 
-- distinguir Git de GitHub;
-- distinguir o repositório da disciplina do seu repositório individual;
-- aceitar o convite para a organização GitHub da turma;
-- aceitar o assignment `Portfólio Redes II` no Classroom 50;
-- instalar Git e GitHub CLI;
-- autenticar sua VM no GitHub;
-- clonar seu repositório individual;
-- criar commits;
-- enviá-los ao GitHub;
-- encerrar sua autenticação.
+```text
+Git
+→ controla versões dos arquivos
+
+GitHub
+→ hospeda e compartilha repositórios Git
+```
+
+O histórico do Git é formado por commits.
 
 ---
 
-# Parte 1 — Entre na organização e aceite seu portfólio
+# 3. GitHub CLI
 
-Antes desta etapa, o professor deverá ter adicionado você ao **roster da turma no Classroom 50**.
+A autenticação utilizada em aula foi realizada com `gh`.
 
-## 1. Aceite o convite da organização
-
-Verifique o e-mail associado à sua conta GitHub.
-
-Você deverá receber um convite do GitHub para entrar na organização:
-
-```text
-diego-canizio-edu
-```
-
-No navegador do Windows:
-
-1. abra o link que recebeu no email cadastrado;
-2. entre na sua conta GitHub (Se não tiver, eis uma boa hora para criar);
-3. Aceite o convite para a organização; 
-4. Entre no site do Classroom 50;
-5. aceite a atividade;
-6. aguarde a criação/configuração do seu repositório;
-7. abra o repositório criado para você.
-
-> Esse repositório será reutilizado durante todo o semestre.
-
----
-
-# Parte 2 — Identifique o repositório correto
-
-No GitHub, abra seu repositório individual e copie sua URL HTTPS.
-
-Ela será semelhante a:
-
-```text
-https://github.com/<ORGANIZACAO>/<SEU-REPOSITORIO>.git
-```
-
-Registre:
-
-```text
-Meu repositório individual:
-
-____________________________________________________________
-```
-
-## Atenção
-
-Não use como repositório de trabalho:
-
-```text
-https://github.com/DiegoCanizio/redes-ii.git
-```
-
-Esse é o repositório oficial da disciplina.
-
----
-
-# Parte 3 — Prepare a VM
-
-## 1. Interfaces
+Comandos trabalhados:
 
 ```bash
-ip -br addr
+gh auth login --web --git-protocol https
+gh auth status
+gh auth setup-git
 ```
 
-## 2. Rotas
-
-```bash
-ip route
-```
-
-## 3. Internet
-
-```bash
-ping -c 3 1.1.1.1
-```
-
-## 4. Resolução de nomes
-
-```bash
-ping -c 3 github.com
-```
-
----
-
-# Parte 4 — Instale as ferramentas
-
-```bash
-sudo apt update
-sudo apt install -y git gh
-```
-
-Verifique:
+Também verificamos:
 
 ```bash
 git --version
@@ -169,304 +84,66 @@ gh --version
 
 ---
 
-# Parte 5 — Autentique esta VM
+# 4. Clonagem do portfólio
 
-Execute:
-
-```bash
-gh auth login --web --git-protocol https
-```
-
-Siga as instruções exibidas no terminal e conclua a autorização no navegador do Windows.
-
-Depois:
-
-```bash
-gh auth status
-```
-
-e:
-
-```bash
-gh auth setup-git
-```
-
----
-
-# Parte 6 — Configure a autoria
-
-Consulte:
-
-```bash
-git config --global user.name
-git config --global user.email
-```
-
-Se necessário:
-
-```bash
-git config --global user.name "Nome Sobrenome"
-git config --global user.email "SEU_EMAIL"
-```
-
-Autenticação e autoria são coisas diferentes:
-
-```text
-gh auth → acesso à conta/repositório
-git config user.* → identificação registrada no commit
-```
-
----
-
-# Parte 7 — Clone SEU repositório
-
-Vá para seu diretório pessoal:
-
-```bash
-cd ~
-```
-
-Agora utilize a URL que você registrou:
+A estrutura básica utilizada foi:
 
 ```bash
 git clone <URL-DO-SEU-REPOSITORIO>
+cd <NOME-DO-REPOSITORIO>
 ```
 
-Entre no diretório criado:
+Para observar o repositório:
 
 ```bash
-cd <NOME-DA-PASTA>
-```
-
-Veja os arquivos:
-
-```bash
-ls
+git status
+git log --oneline
 ```
 
 ---
 
-# Parte 8 — Faça o primeiro commit
+# 5. Primeiro trabalho versionado
 
-Verifique:
+O primeiro commit da disciplina consistiu na personalização do `README.md` do portfólio individual.
 
-```bash
-git status
-```
+Foram registrados dados de identificação solicitados em sala.
 
-Abra:
+Fluxo utilizado:
 
 ```bash
 nano README.md
-```
-
-Acrescente:
-
-```text
-Portfólio iniciado na Aula 01 de Redes de Computadores II.
-```
-
-Salve e saia.
-
-Confira:
-
-```bash
 git status
-```
-
-Prepare:
-
-```bash
 git add README.md
-```
-
-Confira novamente:
-
-```bash
-git status
-```
-
-Crie o commit:
-
-```bash
-git commit -m "Aula 01 - inicia portfólio"
-```
-
-Veja o histórico:
-
-```bash
-git log --oneline
-```
-
-Envie:
-
-```bash
+git commit -m "Atualiza README do portfólio"
 git push
 ```
 
 ---
 
-# Parte 9 — Confirme no GitHub
+# 6. O que ficou registrado
 
-Abra **seu repositório individual** no navegador.
-
-Confirme:
-
-- alteração do README;
-- novo commit;
-- autoria.
-
-O repositório:
+Ao final do encontro, o estudante deveria possuir pelo menos:
 
 ```text
-DiegoCanizio/redes-ii
+Portfólio individual criado
+        +
+README.md personalizado
+        +
+primeiro commit enviado ao GitHub
 ```
-
-deve continuar sem alterações suas.
 
 ---
 
-# Parte 10 — Miniatividade
+## Para consulta
 
-Crie:
+Comandos essenciais:
 
 ```bash
-nano aula-01.txt
-```
-
-Conteúdo:
-
-```text
-Redes de Computadores II
-Git registra versões.
-GitHub hospeda o repositório remoto.
-Este repositório é meu portfólio da disciplina.
-```
-
-Agora complete sozinho:
-
-```text
 git status
-git add
-git commit
+git add ARQUIVO
+git commit -m "mensagem"
 git push
-```
-
-Mensagem sugerida:
-
-```text
-Aula 01 - adiciona atividade inicial
-```
-
-Confirme:
-
-```bash
 git log --oneline
 ```
 
----
-
-# Parte 11 — Diagnóstico de Redes I
-
-Responda sem pesquisar.
-
-1. O que representa `/24` em `192.168.10.20/24`?
-
-____________________________________________________________________
-
-2. Qual é a função de um gateway padrão?
-
-____________________________________________________________________
-
-3. Para que serve DNS?
-
-____________________________________________________________________
-
-4. Cite uma diferença entre TCP e UDP.
-
-____________________________________________________________________
-
-5. Para que serve um endereço MAC em uma LAN?
-
-____________________________________________________________________
-
-6. O que é uma rota?
-
-____________________________________________________________________
-
-7. O que significa dizer que um serviço está escutando em uma porta?
-
-____________________________________________________________________
-
-8. Uma máquina responde ao `ping`, mas SSH não funciona. Isso é contraditório?
-
-____________________________________________________________________
-
-9. Que comando/ferramenta você utilizaria para descobrir o IP de uma máquina Linux?
-
-____________________________________________________________________
-
-10. Diante da frase “a rede não funciona”, qual seria uma das primeiras verificações?
-
-____________________________________________________________________
-
----
-
-# Parte 12 — Encerre sua autenticação
-
-```bash
-gh auth logout
-```
-
-Verifique:
-
-```bash
-gh auth status
-```
-
----
-
-# O que deve estar salvo
-
-No **seu repositório individual**:
-
-```text
-README.md
-aula-01.txt
-```
-
----
-
-# Evidência mínima
-
-Você deve conseguir mostrar:
-
-```bash
-git log --oneline
-```
-
-e os mesmos commits no GitHub.
-
----
-
-# Regra que vale para o semestre
-
-Em cada nova aula, a VM poderá estar limpa.
-
-Você irá:
-
-```text
-autenticar
-   ↓
-clonar o MESMO repositório individual
-   ↓
-continuar o trabalho
-   ↓
-commit
-   ↓
-push
-   ↓
-logout
-```
-
-Seu histórico permanecerá no GitHub.
+A documentação de Git/GitHub será retomada sempre que necessário nas próximas práticas.

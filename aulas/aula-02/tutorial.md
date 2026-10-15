@@ -1,347 +1,168 @@
-# Aula 02 — Recuperando seu portfólio e montando o laboratório virtual
+# Aula 02 — Linux básico, comandos de rede e primeiro script Bash
 
-## Situação-problema
+**Data:** 06/10/2026  
+**Duração realizada:** 100 minutos  
+**Situação:** aula realizada — roteiro consolidado posteriormente.
 
-A VM utilizada na Aula 1 foi restaurada.
-
-Se nosso modelo estiver correto, isso não deve apagar seu trabalho.
-
-Nesta aula você vai:
-
-1. autenticar uma VM limpa;
-2. clonar **o mesmo repositório individual** da Aula 1;
-3. confirmar que seus arquivos e commits continuam disponíveis;
-4. montar a topologia cliente/servidor;
-5. adicionar a documentação da Aula 2 ao mesmo portfólio.
+> Este roteiro registra o conteúdo efetivamente trabalhado. O material complementar de Linux está disponível na pasta `materiais/`.
 
 ---
 
-# Parte 1 — O repositório que você usará
+## Objetivos trabalhados
 
-## Material oficial
+Neste encontro foram exercitados:
 
-```text
-https://github.com/DiegoCanizio/redes-ii
-```
-
-Serve para consultar os materiais da disciplina.
-
-Não é o destino dos seus commits.
-
-## Seu portfólio
-
-É o repositório individual criado para você pelo Classroom 50 na Aula 1.
-
-Use novamente a mesma URL:
-
-```text
-____________________________________________________________
-```
-
-Se você não a tiver registrado, abra o GitHub no navegador e localize seu repositório da atividade `Portfólio Redes II`.
+- navegação básica no terminal Linux;
+- execução de comandos;
+- comandos básicos de diagnóstico de rede;
+- uso de `echo`;
+- criação de um script Bash simples;
+- execução e captura da saída;
+- versionamento do resultado no portfólio.
 
 ---
 
-# Parte 2 — Prepare a VM limpa
+# 1. Linha de comando Linux
+
+Foram utilizados comandos básicos para navegação e observação do sistema.
+
+Exemplos:
 
 ```bash
-sudo apt update
-sudo apt install -y git gh
-```
-
-Autentique:
-
-```bash
-gh auth login --web --git-protocol https
-gh auth setup-git
-```
-
-Verifique:
-
-```bash
-gh auth status
-```
-
----
-
-# Parte 3 — Clone novamente seu portfólio
-
-```bash
-cd ~
-git clone <URL-DO-SEU-REPOSITORIO>
-```
-
-Entre na pasta criada:
-
-```bash
-cd <NOME-DA-PASTA>
-```
-
-Liste:
-
-```bash
+pwd
 ls
+cd
+cat
+nano
 ```
 
-Veja o histórico:
+O objetivo não foi esgotar a administração Linux, mas adquirir autonomia mínima para as práticas de Redes II.
 
-```bash
-git log --oneline
-```
-
-## O que você deve encontrar?
-
-Os arquivos e commits da Aula 1.
-
-Responda:
-
-### A VM preservou esses arquivos entre as aulas?
-
-```text
-☐ Sim
-☐ Não
-```
-
-### Então de onde eles vieram?
-
-____________________________________________________________________
+Para aprofundamento, consulte o material de apoio de linha de comando disponível neste repositório.
 
 ---
 
-# Parte 4 — Arquitetura do laboratório
+# 2. Comandos de rede utilizados
 
-Teremos:
-
-```text
-                         INTERNET
-                            │
-                           NAT
-                    ┌───────┴───────┐
-                    │               │
-             ┌──────┴──────┐ ┌──────┴──────┐
-             │ cli-redes2  │ │ srv-redes2  │
-             └──────┬──────┘ └──────┬──────┘
-                    │               │
-                    └──── REDES2 ───┘
-                       rede interna
-```
-
-Cada VM terá:
-
-```text
-NIC 1 → NAT
-NIC 2 → Rede interna REDES2
-```
-
-> Não utilize bridge/ponte para a rede experimental sem orientação do professor.
-
----
-
-# Parte 5 — Configure as interfaces no hipervisor
-
-Se utilizar VirtualBox, com cada VM desligada:
-
-1. Configurações;
-2. Rede;
-3. Adaptador 1 → NAT;
-4. Adaptador 2 → Rede Interna;
-5. nome da rede interna → `REDES2`.
-
-Repita nas duas VMs.
-
----
-
-# Parte 6 — Configure os hostnames
-
-Na VM cliente:
+Durante a prática foram utilizados comandos como:
 
 ```bash
-sudo hostnamectl set-hostname cli-redes2
+ifconfig
+ping
+route
 ```
 
-Na VM servidor:
+Esses comandos permitiram observar:
+
+- interfaces;
+- endereços;
+- conectividade;
+- tabela de rotas.
+
+Ao longo da disciplina também utilizaremos progressivamente os comandos modernos do `iproute2`:
 
 ```bash
-sudo hostnamectl set-hostname srv-redes2
-```
-
-Verifique:
-
-```bash
-hostnamectl
-```
-
----
-
-# Parte 7 — Identifique as interfaces
-
-Nas duas VMs:
-
-```bash
-ip -br addr
-```
-
-Registre:
-
-| Máquina | Interface NAT | IP NAT | Interface interna |
-|---|---|---|---|
-| `cli-redes2` | | | |
-| `srv-redes2` | | | |
-
----
-
-# Parte 8 — Verifique as rotas
-
-```bash
+ip addr
 ip route
+ip link
 ```
 
-Identifique em cada VM a interface utilizada pela rota padrão.
-
----
-
-# Parte 9 — Teste acesso externo
-
-```bash
-ping -c 3 1.1.1.1
-ping -c 3 github.com
-```
-
----
-
-# Parte 10 — Não configure IP interno ainda
-
-Não configure ainda:
+Exemplos de equivalência:
 
 ```text
-192.168.50.10
-192.168.50.20
+ifconfig  → ip addr
+route     → ip route
 ```
-
-Isso será feito na próxima aula.
 
 ---
 
-# Parte 11 — Documente no MESMO repositório
+# 3. Bash e `echo`
 
-Retorne à pasta clonada do seu portfólio.
+Foi elaborado um script simples reunindo comandos de diagnóstico.
 
-Crie:
+O `echo` foi utilizado tanto para inserir linhas em branco quanto para identificar as partes da saída.
+
+Exemplo conceitual:
 
 ```bash
-mkdir -p ambiente
-nano ambiente/README.md
+#!/bin/bash
+
+echo "=== Interfaces ==="
+ifconfig
+
+echo
+echo "=== Rotas ==="
+route
+
+echo
+echo "=== Teste de conectividade ==="
+ping -c 3 1.1.1.1
 ```
 
-Use:
-
-```markdown
-# Ambiente de laboratório
-
-## Cliente
-
-Hostname: cli-redes2
-Interface NAT:
-Endereço NAT:
-Interface interna:
-
-## Servidor
-
-Hostname: srv-redes2
-Interface NAT:
-Endereço NAT:
-Interface interna:
-
-## Rede interna
-
-Nome: REDES2
-```
-
-Preencha os campos.
+O importante nesta etapa foi perceber que um conjunto repetitivo de comandos pode ser registrado em um script.
 
 ---
 
-# Parte 12 — Commit da Aula 2
+# 4. Permissão e execução
+
+Um script pode ser executado, por exemplo, com:
+
+```bash
+bash diagnostico.sh
+```
+
+ou, quando possui permissão de execução:
+
+```bash
+chmod +x diagnostico.sh
+./diagnostico.sh
+```
+
+---
+
+# 5. Registro da saída
+
+A saída do script foi utilizada como evidência da atividade.
+
+Uma forma de registrar a execução é:
+
+```bash
+./diagnostico.sh > saida.txt
+```
+
+Quando queremos visualizar e salvar ao mesmo tempo:
+
+```bash
+./diagnostico.sh | tee saida.txt
+```
+
+---
+
+# 6. Segundo commit da disciplina
+
+O segundo commit registrado pela turma correspondeu à atividade com o script Bash e sua saída.
+
+O fluxo utilizado continuou sendo:
 
 ```bash
 git status
-git add ambiente/README.md
-git commit -m "Aula 02 - documenta ambiente virtual"
+git add <ARQUIVOS-DA-ATIVIDADE>
+git commit -m "Registra diagnostico de rede em Bash"
 git push
 ```
 
-Depois:
-
-```bash
-git log --oneline
-```
-
-Você deverá enxergar commits da Aula 1 **e** da Aula 2.
-
 ---
 
-# Parte 13 — Confira no GitHub
+# Síntese
 
-Abra seu repositório individual.
-
-A estrutura mínima deverá ser semelhante a:
+Até este ponto, o portfólio passou a registrar:
 
 ```text
-README.md
-aula-01.txt
-ambiente/
-└── README.md
+Commit 1
+→ identificação no README
+
+Commit 2
+→ script/saída de comandos básicos de rede
 ```
 
-Isso comprova que o portfólio está crescendo mesmo que as VMs sejam restauradas.
-
----
-
-# Parte 14 — Logout
-
-```bash
-gh auth logout
-```
-
-Verifique:
-
-```bash
-gh auth status
-```
-
----
-
-# Regra para as próximas aulas
-
-Em uma VM restaurada:
-
-```text
-instalar git/gh
-   ↓
-autenticar
-   ↓
-clonar seu repositório individual
-   ↓
-recuperar o histórico
-   ↓
-trabalhar
-   ↓
-commit + push
-   ↓
-logout
-```
-
-O repositório individual é sempre o mesmo.
-
----
-
-# Próxima aula
-
-Na Aula 3 configuraremos a rede interna:
-
-```text
-Servidor → 192.168.50.10/24
-Cliente  → 192.168.50.20/24
-```
-
-e começaremos a armazenar também arquivos de configuração de rede no portfólio.
+Esses dois commits formam o ponto de partida para as próximas práticas.

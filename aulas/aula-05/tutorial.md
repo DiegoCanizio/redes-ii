@@ -1,159 +1,593 @@
-# Aula 05 — Troubleshooting estruturado e captura de pacotes
+# Aula 05 — Meu Servidor de Redes II: ambiente persistente e consolidação do SSH
+
+**Data:** 15/10/2026  
+**Duração prevista:** 150 minutos
+
+---
 
 ## Situação-problema
 
-Quando alguém diz:
+Até agora trabalhamos em máquinas virtuais preparadas no laboratório.
 
-> “A rede não está funcionando.”
+A partir de hoje, cada estudante passa a possuir um **servidor Linux individual e persistente** para Redes de Computadores II.
 
-isso ainda não é um diagnóstico.
-
-Pode haver problema na:
+Isso muda a forma de trabalhar:
 
 ```text
-interface
-endereço
-rede
-rota
-nome
-porta
-serviço
-filtragem
-aplicação
+antes
+VM do laboratório
+→ podia ser restaurada
+→ reconstrução frequente
+
+agora
+srv-r2-sNN
+→ individual
+→ persistente
+→ acessado por SSH
+→ configurações permanecem entre as aulas
 ```
 
-Nesta aula vamos organizar uma forma de investigar problemas e utilizar `tcpdump` para observar os pacotes que realmente circulam na rede.
+O objetivo desta aula é conhecer esse novo ambiente, estabelecer regras de operação e consolidar o conteúdo de SSH trabalhado no encontro anterior.
 
-> **Sintoma não é causa. Antes de alterar uma configuração, produza evidências.**
+> **O servidor é persistente. Não trate uma alteração de configuração como descartável.**
 
-## Objetivos
+---
 
-Ao concluir esta aula, você deverá conseguir:
+# Objetivos
 
-- aplicar uma sequência de troubleshooting;
-- identificar interface, endereço e rota;
-- verificar portas e serviços;
-- capturar pacotes com `tcpdump`;
-- observar ARP;
-- observar ICMP;
-- observar uma conexão TCP;
-- reconhecer SYN, SYN/ACK e ACK;
-- salvar uma captura `.pcap`;
-- diagnosticar um problema de porta;
-- registrar evidências antes da correção.
+Ao final da aula, você deverá conseguir:
 
-## Topologia
+- acessar seu servidor individual pelo Windows;
+- trocar a senha inicial;
+- confirmar usuário e hostname;
+- identificar `host0` e `lab0`;
+- interpretar a rota padrão;
+- testar Internet e resolução de nomes;
+- explicar a função de cada interface;
+- consultar o serviço SSH e sua porta;
+- realizar uma alteração segura na configuração complementar do SSH;
+- validar a configuração antes de reiniciar o serviço;
+- confirmar o acesso em uma segunda sessão SSH;
+- configurar Git/GitHub no servidor persistente;
+- registrar no portfólio a configuração SSH;
+- documentar seu novo ambiente de Redes II.
+
+---
+
+# Topologia a partir de hoje
 
 ```text
-                     INTERNET
-                        │
-                       NAT
-            ┌───────────┴───────────┐
-            │                       │
-     ┌──────┴──────┐         ┌──────┴──────┐
-     │ cli-redes2  │         │ srv-redes2  │
-     │ .50.20/24   │         │ .50.10/24   │
-     └──────┬──────┘         └──────┬──────┘
-            │                       │
-            └────── REDES2 ─────────┘
-              192.168.50.0/24
+Computador Windows
+        │
+        │ SSH
+        │ 172.16.2.34:PORTA_INDIVIDUAL
+        ▼
+┌─────────────────────────────┐
+│ srv-r2-sNN                  │
+│ seu servidor persistente    │
+│                             │
+│ host0 → gerenciamento       │
+│ lab0  → laboratório         │
+└──────────────┬──────────────┘
+               │
+               │ rede individual
+               │
+┌──────────────┴──────────────┐
+│ cli-r2-sNN                  │
+│ cliente individual          │
+└─────────────────────────────┘
 ```
 
-# Bloco 0 — Preparação do ambiente
+> **Hoje trabalharemos principalmente no servidor. O cliente será utilizado progressivamente nas próximas aulas.**
 
-As VMs podem estar limpas novamente.
+---
 
-## 1. Hostnames
+# Parte 1 — Receba suas credenciais
 
-Cliente:
+O professor fornecerá individualmente:
+
+```text
+Servidor: 172.16.2.34
+Porta SSH: __________
+Usuário: __________
+Senha inicial: __________
+```
+
+Não compartilhe sua senha.
+
+Cada aluno possui seu próprio usuário e sua própria porta de acesso.
+
+---
+
+# Parte 2 — Primeiro acesso pelo Windows
+
+Abra o PowerShell, Prompt de Comando ou Windows Terminal.
+
+Utilize:
+
+```powershell
+ssh -p SUA_PORTA SEU_USUARIO@172.16.2.34
+```
+
+Exemplo apenas de formato:
+
+```powershell
+ssh -p 2201 ana@172.16.2.34
+```
+
+No primeiro acesso pode aparecer uma confirmação de chave do host.
+
+Leia a mensagem e, quando for o servidor informado pelo professor, confirme:
+
+```text
+yes
+```
+
+Digite a senha inicial.
+
+> Ao digitar a senha no terminal, os caracteres não aparecem na tela.
+
+---
+
+# Parte 3 — Troque a senha inicial
+
+O sistema poderá exigir a alteração imediatamente.
+
+Se necessário, também é possível utilizar:
 
 ```bash
-sudo hostnamectl set-hostname cli-redes2
+passwd
 ```
 
-Servidor:
+Depois da troca, a nova senha é pessoal.
+
+---
+
+# Parte 4 — Confirme onde você está
+
+Execute:
 
 ```bash
-sudo hostnamectl set-hostname srv-redes2
+whoami
+hostname
+pwd
 ```
 
-## 2. Rede interna
+Registre:
 
-Confirme com:
+```text
+Meu usuário: __________________________________
+
+Meu hostname: _________________________________
+```
+
+O hostname deverá seguir o padrão:
+
+```text
+srv-r2-sNN
+```
+
+---
+
+# Parte 5 — Conheça suas interfaces
+
+Execute:
 
 ```bash
 ip -br addr
 ```
 
-Servidor:
+Procure:
 
 ```text
-192.168.50.10/24
+lo
+host0
+lab0
 ```
 
-Cliente:
+## `host0`
+
+É a interface de gerenciamento.
+
+Ela fornece:
+
+- acesso SSH;
+- Internet;
+- acesso ao GitHub;
+- instalação de pacotes.
+
+### Regra
+
+> **Não altere `host0` sem orientação do professor.**
+
+## `lab0`
+
+É a interface reservada aos experimentos da disciplina.
+
+Ela será utilizada para comunicação com seu cliente individual e para os serviços que estudaremos.
+
+Hoje ela pode aparecer **sem endereço IPv4**.
+
+Isso é esperado.
+
+### Regra
+
+> **Não crie gateway padrão pela `lab0` sem orientação.**
+
+---
+
+# Parte 6 — Observe as rotas
+
+Execute:
+
+```bash
+ip route
+```
+
+Localize a rota:
 
 ```text
-192.168.50.20/24
+default via ...
 ```
 
-Se necessário, recupere a configuração Netplan da Aula 3.
+Observe por qual interface ela utiliza.
 
-Valide:
+Responda:
 
-```bash
-sudo netplan generate
-sudo netplan try
+```text
+A rota padrão utiliza: _______________________
 ```
 
-## 3. Teste a rede
+Ela deve estar relacionada à interface de gerenciamento, e não à `lab0`.
 
-No cliente:
+---
+
+# Parte 7 — Teste acesso externo
+
+Teste conectividade IP:
 
 ```bash
-ping -c 3 192.168.50.10
+ping -c 3 1.1.1.1
 ```
 
-## 4. Instale todas as ferramentas necessárias
-
-### Servidor
+Teste resolução de nomes:
 
 ```bash
-sudo apt update
-sudo apt install -y openssh-server tcpdump netcat-openbsd iproute2 iputils-ping
+getent hosts github.com
 ```
 
-### Cliente
+Se ambos funcionarem, temos evidências diferentes:
 
-```bash
-sudo apt update
-sudo apt install -y openssh-client tcpdump netcat-openbsd iproute2 iputils-ping git gh
+```text
+ping para 1.1.1.1
+→ conectividade IP
+
+getent hosts github.com
+→ resolução de nomes
 ```
 
-## 5. Garanta que o SSH esteja ativo
+---
 
-No servidor:
+# Parte 8 — Revise o SSH no novo servidor
 
-```bash
-sudo systemctl start ssh
-systemctl is-active ssh
-```
-
-## 6. Prepare o portfólio
-
-No cliente:
+Consulte:
 
 ```bash
-gh auth login --web --git-protocol https
-gh auth setup-git
+systemctl status ssh
 ```
 
 Depois:
 
 ```bash
+sudo ss -lntp | grep ':22'
+```
+
+Observe:
+
+- serviço ativo;
+- processo;
+- porta em `LISTEN`.
+
+Consulte também:
+
+```bash
+sudo sshd -T | head
+```
+
+O comando `sshd -T` mostra a configuração efetiva interpretada pelo servidor SSH.
+
+---
+
+# Parte 9 — Regra especial do novo ambiente
+
+O acesso externo ao seu servidor depende da porta individual fornecida pelo professor e do encaminhamento até a **porta 22 do container**.
+
+Portanto:
+
+> **NÃO altere a diretiva `Port 22` do SSH no servidor persistente.**
+
+Uma alteração da porta interna poderia impedir seu acesso normal ao ambiente.
+
+Nesta disciplina, quando quisermos estudar outra porta, faremos isso de forma controlada.
+
+---
+
+# Parte 10 — Faça backup da configuração
+
+Antes de alterar:
+
+```bash
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak-aula05
+```
+
+Confira:
+
+```bash
+sudo ls -l /etc/ssh/sshd_config*
+```
+
+---
+
+# Parte 11 — Use um arquivo complementar
+
+Em vez de alterar muitas linhas do arquivo principal, utilizaremos um arquivo complementar.
+
+Verifique primeiro:
+
+```bash
+ls -l /etc/ssh/sshd_config.d/
+```
+
+Crie:
+
+```bash
+sudo nano /etc/ssh/sshd_config.d/90-redes2.conf
+```
+
+Conteúdo da aula:
+
+```text
+# Redes de Computadores II
+PermitRootLogin no
+MaxAuthTries 3
+LoginGraceTime 60
+```
+
+Essas opções:
+
+```text
+PermitRootLogin no
+→ impede login SSH direto como root
+
+MaxAuthTries 3
+→ limita tentativas de autenticação por conexão
+
+LoginGraceTime 60
+→ limita o tempo disponível para autenticação
+```
+
+> Não adicione uma diretiva `Port` neste arquivo.
+
+---
+
+# Parte 12 — Valide ANTES de reiniciar
+
+Execute:
+
+```bash
+sudo sshd -t
+```
+
+Se houver erro:
+
+```text
+NÃO reinicie o serviço.
+```
+
+Leia a mensagem, corrija o arquivo e execute novamente:
+
+```bash
+sudo sshd -t
+```
+
+Se não houver saída, prossiga.
+
+---
+
+# Parte 13 — Mantenha sua sessão atual aberta
+
+Não feche o terminal SSH em que você está trabalhando.
+
+Reinicie o serviço:
+
+```bash
+sudo systemctl restart ssh
+```
+
+Confira:
+
+```bash
+systemctl is-active ssh
+```
+
+Resultado esperado:
+
+```text
+active
+```
+
+---
+
+# Parte 14 — Valide em uma SEGUNDA janela
+
+Abra outra janela do PowerShell/Prompt no Windows.
+
+Conecte novamente:
+
+```powershell
+ssh -p SUA_PORTA SEU_USUARIO@172.16.2.34
+```
+
+Somente depois que a segunda conexão funcionar, considere a alteração validada.
+
+Essa técnica reduz o risco de perder o acesso remoto durante uma alteração de SSH.
+
+---
+
+# Parte 15 — Consulte evidências
+
+No servidor:
+
+```bash
+sudo ss -lntp | grep ':22'
+```
+
+Depois:
+
+```bash
+sudo journalctl -u ssh -n 20 --no-pager
+```
+
+Temos agora evidências de:
+
+```text
+configuração válida
+        +
+serviço ativo
+        +
+porta em LISTEN
+        +
+novo acesso remoto funcionando
+```
+
+---
+
+# Parte 16 — Prepare Git/GitHub no servidor persistente
+
+Verifique:
+
+```bash
+git --version
+gh --version
+```
+
+Configure sua autoria, se necessário:
+
+```bash
+git config --global user.name "Seu Nome"
+git config --global user.email "SEU_EMAIL"
+```
+
+Autentique:
+
+```bash
+gh auth login --web --git-protocol https
+gh auth status
+gh auth setup-git
+```
+
+Abra o navegador apenas para concluir a autorização solicitada.
+
+Em computadores compartilhados, encerre depois as sessões abertas no navegador.
+
+---
+
+# Parte 17 — Clone o portfólio no servidor
+
+Vá para seu diretório pessoal:
+
+```bash
 cd ~
+```
+
+Clone seu repositório individual:
+
+```bash
 git clone <URL-DO-SEU-REPOSITORIO>
-cd <NOME-DA-PASTA>
+```
+
+Entre:
+
+```bash
+cd <NOME-DO-REPOSITORIO>
+```
+
+Confira o histórico:
+
+```bash
+git log --oneline
+```
+
+Você deverá reconhecer os commits já realizados.
+
+> Como o servidor é persistente, nas próximas aulas normalmente você apenas entrará nessa pasta. Não será necessário clonar novamente.
+
+---
+
+# Parte 18 — Encerre a pendência da Aula 04
+
+Crie:
+
+```bash
+mkdir -p aula-04/ssh
+```
+
+Salve uma cópia do arquivo principal:
+
+```bash
+sudo cat /etc/ssh/sshd_config > aula-04/ssh/sshd_config
+```
+
+Salve também a configuração complementar criada hoje:
+
+```bash
+sudo cat /etc/ssh/sshd_config.d/90-redes2.conf > aula-04/ssh/90-redes2.conf
+```
+
+Confira:
+
+```bash
+ls -l aula-04/ssh
+```
+
+E:
+
+```bash
+cat aula-04/ssh/90-redes2.conf
+```
+
+---
+
+# Parte 19 — Terceiro commit: SSH
+
+Confira antes:
+
+```bash
+git status
+```
+
+Adicione somente os arquivos da atividade:
+
+```bash
+git add aula-04/ssh/
+```
+
+Veja novamente:
+
+```bash
+git status
+```
+
+Commit:
+
+```bash
+git commit -m "Aula 04 - registra configuracao do SSH"
+```
+
+Envie:
+
+```bash
+git push
 ```
 
 Confira:
@@ -162,669 +596,154 @@ Confira:
 git log --oneline
 ```
 
-# Parte 1 — Método de troubleshooting
+Agora a atividade de SSH está registrada no histórico.
 
-Utilizaremos esta sequência como referência:
+---
 
-```text
-1. Interface
-2. Endereço
-3. Rede
-4. Rota
-5. Nome
-6. Porta
-7. Serviço
-8. Filtragem
-9. Aplicação
-```
+# Parte 20 — Documente seu novo servidor
 
-Nem todo problema exigirá todos os passos.
-
-O importante é **não começar alterando coisas aleatoriamente**.
-
-## Interface
+Crie:
 
 ```bash
-ip -br link
+mkdir -p aula-05
+nano aula-05/ambiente.md
 ```
 
-Pergunta: a interface existe e está ativa?
+Utilize como estrutura:
 
-## Endereço
+```markdown
+# Meu Servidor de Redes II
+
+## Identificação
+
+Usuário:
+Hostname:
+Porta SSH externa:
+
+## Interfaces
+
+Interface de gerenciamento: host0
+Endereço observado em host0:
+
+Interface de laboratório: lab0
+Endereço observado em lab0:
+
+## Rota padrão
+
+Interface utilizada:
+
+## Testes
+
+Ping para 1.1.1.1:
+Resolução de github.com:
+
+## SSH
+
+Status do serviço:
+Porta interna:
+Arquivo complementar utilizado:
+
+## Regras importantes
+
+- não alterar host0;
+- não criar gateway padrão por lab0;
+- não alterar a porta interna 22 do SSH sem orientação.
+```
+
+Preencha com os dados do seu ambiente.
+
+> **Não coloque sua senha no arquivo.**
+
+---
+
+# Parte 21 — Quarto commit: ambiente persistente
+
+Confira:
 
 ```bash
-ip -br addr
-```
-
-Pergunta: o endereço está correto?
-
-## Rede
-
-Pergunta: origem e destino pertencem à mesma rede?
-
-No laboratório:
-
-```text
-192.168.50.10/24
-192.168.50.20/24
-```
-
-sim.
-
-## Rota
-
-```bash
-ip route
-ip route get 192.168.50.10
-```
-
-Pergunta: por onde o Linux pretende enviar o pacote?
-
-## Nome
-
-Quando usamos nomes, precisamos saber se o nome está sendo convertido para o endereço esperado. DNS será estudado em profundidade mais adiante.
-
-## Porta
-
-No servidor:
-
-```bash
-ss -lntp
-```
-
-Pergunta: existe uma aplicação escutando na porta esperada?
-
-## Serviço
-
-```bash
-systemctl status ssh
-```
-
-Pergunta: o serviço está ativo?
-
-## Filtragem
-
-Mais adiante estudaremos firewall. Por enquanto, saiba que um filtro pode permitir um tipo de tráfego e bloquear outro.
-
-## Aplicação
-
-Teste finalmente o serviço do ponto de vista do cliente.
-
-Exemplo:
-
-```bash
-ssh <USUARIO>@192.168.50.10
-```
-
-# Parte 2 — Regra de ouro
-
-Antes de corrigir:
-
-```text
-Observe
-  ↓
-Formule uma hipótese
-  ↓
-Escolha um teste
-  ↓
-Registre a evidência
-```
-
-Só então:
-
-```text
-Corrija
-  ↓
-Valide
-```
-
-# Parte 3 — Conhecendo o tcpdump
-
-`tcpdump` permite observar pacotes em uma interface.
-
-## 7. Liste as interfaces
-
-No servidor:
-
-```bash
-sudo tcpdump -D
-```
-
-Compare com:
-
-```bash
-ip -br addr
-```
-
-Identifique a interface ligada à `REDES2`.
-
-```text
-Interface REDES2 do servidor: ______________________________
-```
-
-## 8. Inicie uma captura simples
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2>
-```
-
-Aguarde alguns segundos e interrompa com:
-
-```text
-Ctrl+C
-```
-
-## 9. Evite resolução de nomes
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn
-```
-
-`-nn` mantém endereços e portas em formato numérico.
-
-Interrompa com `Ctrl+C`.
-
-# Parte 4 — Capture ARP e ICMP
-
-No servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn 'arp or icmp'
-```
-
-Deixe a captura executando.
-
-## 10. Force uma nova descoberta de vizinho
-
-No cliente, descubra sua interface interna:
-
-```bash
-ip route get 192.168.50.10
+git status
 ```
 
 Depois:
 
 ```bash
-sudo ip neigh flush dev <INTERFACE-REDES2>
-```
-
-Agora:
-
-```bash
-ping -c 3 192.168.50.10
-```
-
-## 11. Observe no servidor
-
-Procure mensagens relacionadas a:
-
-```text
-ARP Request
-ARP Reply
-ICMP echo request
-ICMP echo reply
-```
-
-Pare a captura com `Ctrl+C`.
-
-# Parte 5 — Interprete
-
-## Qual protocolo apareceu antes do primeiro ICMP?
-
-```text
-____________________________________
-```
-
-## O que o cliente estava tentando descobrir?
-
-____________________________________________________________________
-
-## Depois dessa descoberta, que protocolo foi utilizado pelo `ping`?
-
-```text
-____________________________________
-```
-
-# Parte 6 — Salve uma captura ARP/ICMP
-
-No servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -c 10 -w aula-05-arp-icmp.pcap 'arp or icmp'
-```
-
-Enquanto o comando aguarda, no cliente:
-
-```bash
-sudo ip neigh flush dev <INTERFACE-REDES2>
-ping -c 3 192.168.50.10
-```
-
-Quando terminar, no servidor:
-
-```bash
-tcpdump -nn -r aula-05-arp-icmp.pcap
-```
-
-# Parte 7 — Capture uma conexão TCP
-
-No servidor:
-
-```bash
-systemctl is-active ssh
-ss -lntp | grep ':22'
-```
-
-Inicie:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn 'tcp port 22'
-```
-
-## 12. Abra uma nova conexão
-
-No cliente:
-
-```bash
-ssh <USUARIO>@192.168.50.10
-```
-
-Depois de entrar:
-
-```bash
-hostname
-exit
-```
-
-Pare o `tcpdump` com `Ctrl+C`.
-
-# Parte 8 — O início de uma conexão TCP
-
-No início da captura, procure flags relacionadas a:
-
-```text
-SYN
-SYN, ACK
-ACK
-```
-
-De forma simplificada:
-
-```text
-cliente  → SYN      → quero iniciar a conexão
-servidor → SYN/ACK  → recebi e estou pronto
-cliente  → ACK      → confirmação
-```
-
-Esse processo é chamado de **three-way handshake**.
-
-Não é necessário interpretar números de sequência nesta aula.
-
-# Parte 9 — Salve a captura TCP
-
-No servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -c 20 -w aula-05-tcp-ssh.pcap 'tcp port 22'
-```
-
-No cliente, abra outra conexão SSH e encerre-a.
-
-Depois, no servidor:
-
-```bash
-tcpdump -nn -r aula-05-tcp-ssh.pcap
-```
-
-# Parte 10 — Incidente controlado
-
-Você recebeu a seguinte informação:
-
-> Existe um serviço TCP de teste no servidor e ele deve ser acessado na porta 8080.
-
-Não altere configurações ainda.
-
-## 13. Teste a conectividade
-
-No cliente:
-
-```bash
-ping -c 3 192.168.50.10
-```
-
-## 14. Teste a porta informada
-
-```bash
-nc -vz 192.168.50.10 8080
-```
-
-Registre:
-
-```text
-____________________________________________________________
-
-____________________________________________________________
-```
-
-# Parte 11 — Diagnostique
-
-Use o método.
-
-## Sintoma
-
-____________________________________________________________________
-
-## Hipótese
-
-____________________________________________________________________
-
-## Interface
-
-```bash
-ip -br link
-```
-
-Evidência:
-
-____________________________________________________________________
-
-## Endereço
-
-```bash
-ip -br addr
-```
-
-Evidência:
-
-____________________________________________________________________
-
-## Rota
-
-```bash
-ip route get 192.168.50.10
-```
-
-Evidência:
-
-____________________________________________________________________
-
-## Porta no servidor
-
-No servidor:
-
-```bash
-ss -lntp | grep -E ':8080|:8081'
-```
-
-Evidência:
-
-____________________________________________________________________
-
-# Parte 12 — Capture a tentativa
-
-No servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn 'tcp port 8080 or tcp port 8081'
-```
-
-No cliente:
-
-```bash
-nc -vz 192.168.50.10 8080
-```
-
-Observe e pare com `Ctrl+C`.
-
-# Parte 13 — Identifique a causa
-
-Complete:
-
-```text
-Porta informada ao cliente: __________________
-
-Porta realmente em escuta: __________________
-
-Causa:
-____________________________________________________________
-```
-
-# Parte 14 — Corrija e valide
-
-Use a porta realmente observada:
-
-```bash
-nc -vz 192.168.50.10 8081
-```
-
-Resultado:
-
-```text
-____________________________________________________________
-```
-
-## Teste com dados
-
-No servidor, quando orientado:
-
-```bash
-nc -l 8081
-```
-
-No cliente:
-
-```bash
-nc 192.168.50.10 8081
-```
-
-Digite:
-
-```text
-teste aula 05
-```
-
-Observe no servidor.
-
-> Dependendo da implementação do `nc`, o processo de escuta pode terminar depois da conexão. Execute novamente quando necessário.
-
-# Parte 15 — Relatório do incidente
-
-## Sintoma
-
-____________________________________________________________________
-
-## Hipótese
-
-____________________________________________________________________
-
-## Testes executados
-
-____________________________________________________________________
-
-## Evidências
-
-Inclua pelo menos duas evidências diferentes.
-
-____________________________________________________________________
-
-____________________________________________________________________
-
-## Causa
-
-____________________________________________________________________
-
-## Correção
-
-____________________________________________________________________
-
-## Validação
-
-____________________________________________________________________
-
-# Parte 16 — Copie as capturas para o portfólio
-
-No cliente, entre no repositório:
-
-```bash
-cd ~/<NOME-DA-PASTA>
-mkdir -p rede/aula-05
-cd rede/aula-05
-```
-
-Se as capturas estão no diretório pessoal do servidor:
-
-```bash
-scp <USUARIO>@192.168.50.10:~/aula-05-arp-icmp.pcap .
-scp <USUARIO>@192.168.50.10:~/aula-05-tcp-ssh.pcap .
-```
-
-Confira:
-
-```bash
-ls -lh
-```
-
-# Parte 17 — Documente
-
-Crie:
-
-```bash
-nano README.md
-```
-
-Use:
-
-```markdown
-# Aula 05 — Troubleshooting e captura de pacotes
-
-## Método utilizado
-
-1. Interface
-2. Endereço
-3. Rede
-4. Rota
-5. Nome
-6. Porta
-7. Serviço
-8. Filtragem
-9. Aplicação
-
-## Captura ARP/ICMP
-
-Interface capturada:
-
-O que foi observado antes do ICMP:
-
-Resumo da sequência:
-
-## Captura TCP/SSH
-
-Interface capturada:
-
-Porta:
-
-Handshake observado:
-
-## Incidente TCP
-
-### Sintoma
-### Hipótese
-### Testes
-### Evidências
-### Causa
-### Correção
-### Validação
-
-## Síntese
-
-Explique por que “não funciona” não é um diagnóstico.
-```
-
-Preencha com suas observações reais.
-
-# Parte 18 — Versione
-
-Volte à raiz do portfólio:
-
-```bash
-git status
-git add rede/aula-05
-git diff --cached --stat
-git commit -m "Aula 05 - registra troubleshooting e capturas"
+git add aula-05/ambiente.md
+git commit -m "Aula 05 - documenta servidor persistente"
 git push
 ```
 
-# Parte 19 — Logout
+Confira no histórico:
 
 ```bash
-gh auth logout
-gh auth status
+git log --oneline
 ```
 
-# O que deve estar salvo
+---
+
+# Resultado esperado no portfólio
+
+O histórico deve possuir, no mínimo, a sequência de trabalhos realizados:
 
 ```text
-rede/
-└── aula-05/
-    ├── README.md
-    ├── aula-05-arp-icmp.pcap
-    └── aula-05-tcp-ssh.pcap
+1º commit
+→ identificação/README
+
+2º commit
+→ script e/ou saída de diagnóstico de rede
+
+3º commit
+→ configuração SSH
+
+4º commit
+→ documentação do servidor persistente
 ```
 
-# Testes de aprendizagem
+Os nomes exatos dos commits podem variar.
 
-### Se `ping` funciona, isso prova que SSH funciona?
+---
+
+# Checklist da aula
 
 ```text
-☐ Sim
-☐ Não
+[ ] Acessei meu servidor pela porta individual.
+[ ] Troquei minha senha inicial.
+[ ] Confirmei usuário e hostname.
+[ ] Identifiquei host0.
+[ ] Identifiquei lab0.
+[ ] Localizei a rota padrão.
+[ ] Testei Internet.
+[ ] Testei resolução de nomes.
+[ ] Verifiquei o serviço SSH.
+[ ] Verifiquei a porta 22.
+[ ] Criei 90-redes2.conf.
+[ ] Validei com sshd -t.
+[ ] Reiniciei o SSH.
+[ ] Testei uma segunda conexão pelo Windows.
+[ ] Clonei/abri meu portfólio no servidor.
+[ ] Fiz o commit da configuração SSH.
+[ ] Documentei meu ambiente persistente.
+[ ] Fiz push dos novos commits.
 ```
 
-### Se um pacote TCP chega ao servidor, isso prova que existe uma aplicação escutando naquela porta?
+---
 
-```text
-☐ Sim
-☐ Não
-```
+# O que você deve ter aprendido
 
-### Se `ss` mostra uma porta em `LISTEN`, isso prova sozinho que um cliente remoto conseguirá acessá-la?
+Ao final desta aula, você deve conseguir explicar:
 
-```text
-☐ Sim
-☐ Não
-```
+1. por que seu servidor agora é persistente;
+2. qual é a diferença entre `host0` e `lab0`;
+3. por que não devemos alterar `host0`;
+4. por que não devemos mudar a porta interna 22;
+5. por que `systemctl status ssh` e `ss -lntp` fornecem evidências diferentes;
+6. por que uma configuração deve ser validada antes do restart;
+7. por que mantemos a sessão SSH atual aberta enquanto testamos uma nova;
+8. por que configuração e documentação devem ser versionadas.
 
-### Por que precisamos combinar evidências?
-
-____________________________________________________________________
-
-____________________________________________________________________
-
-# Você deve ter aprendido
-
-Um bom troubleshooting não começa com:
-
-```text
-“vou reiniciar tudo”
-```
-
-Ele começa com:
-
-```text
-“qual é o sintoma e que evidência posso produzir?”
-```
+---
 
 # Próxima aula
 
-Na próxima aula vamos observar um protocolo que automatiza a configuração de rede do cliente.
+Na próxima etapa, utilizaremos o ambiente persistente para aprofundar o **troubleshooting estruturado** e a observação do tráfego da rede.
 
-Antes de instalar qualquer servidor, vamos capturar e interpretar:
-
-```text
-DHCP Discover
-DHCP Offer
-DHCP Request
-DHCP ACK
-```
-
-processo conhecido como **DORA**.
+A partir daqui, o servidor passa a ser o ambiente principal de trabalho da disciplina.
