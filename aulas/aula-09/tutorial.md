@@ -1,307 +1,329 @@
-# Aula 09 — DNS: consultas e captura
+# Aula 09 — DHCP: leases, reservas e diagnóstico
 
-## Objetivo
-
-Hoje você utilizará DNS como cliente antes de configurar seu próprio servidor.
-
-Ferramenta principal:
-
-```text
-dig
-```
-
-Registros:
-
-```text
-A
-AAAA
-CNAME
-MX
-NS
-PTR
-```
+**Data:** 29/10/2026  
+**Duração:** 150 minutos
 
 ---
 
-# Bloco 0
+## Objetivo
 
-Nesta aula a rede interna pode permanecer estática:
+Partindo do DHCP funcional da Aula 08, hoje você deverá:
 
-```text
-srv-redes2 → 192.168.50.10/24
-cli-redes2 → 192.168.50.20/24
+- interpretar leases;
+- identificar o cliente pelo MAC;
+- criar uma reserva;
+- validar opções entregues ao cliente;
+- provocar e diagnosticar uma falha;
+- documentar o serviço no portfólio.
+
+---
+
+# 1. Confirme o estado inicial
+
+No servidor:
+
+```bash
+ip -br addr show lab0
+systemctl is-active kea-dhcp4-server
+sudo ss -lunp | grep ':67'
 ```
 
 No cliente:
 
 ```bash
-sudo apt update
-sudo apt install -y dnsutils tcpdump git gh
+ip -br addr show lab0
 ```
-
-Prepare seu portfólio.
 
 ---
 
-# Parte 1 — Descubra o DNS do sistema
+# 2. Observe os leases
+
+No servidor:
 
 ```bash
-resolvectl status
+sudo cat /var/lib/kea/kea-leases4.csv
 ```
 
-Depois:
+Localize:
+
+```text
+address
+hwaddr
+valid_lifetime
+expire
+hostname
+```
+
+O arquivo é estado de execução. Não é o principal arquivo de configuração.
+
+---
+
+# 3. Descubra o MAC do cliente
+
+No cliente:
 
 ```bash
-cat /etc/resolv.conf
+ip link show lab0
+```
+
+Localize:
+
+```text
+link/ether
 ```
 
 Registre:
 
 ```text
-Servidor/resolvedor observado:
-____________________________________________________________
-```
-
----
-
-# Parte 2 — Registros A e AAAA
-
-```bash
-dig example.com A
-```
-
-Depois:
-
-```bash
-dig example.com AAAA
-```
-
-Complete:
-
-```text
-A representa:
-____________________________________________________________
-
-AAAA representa:
-____________________________________________________________
-```
-
----
-
-# Parte 3 — NS
-
-```bash
-dig example.com NS
-```
-
-O registro NS indica:
-
-____________________________________________________________________
-
----
-
-# Parte 4 — MX
-
-```bash
-dig gmail.com MX
-```
-
-Observe os valores de preferência e os nomes dos servidores.
-
-MX está relacionado a:
-
-____________________________________________________________________
-
----
-
-# Parte 5 — CNAME
-
-O professor fornecerá um nome previamente validado que utilize CNAME.
-
-Execute:
-
-```bash
-dig <NOME-FORNECIDO> CNAME
-```
-
-CNAME representa:
-
-____________________________________________________________________
-
----
-
-# Parte 6 — Seções da resposta
-
-Em uma consulta `dig`, identifique:
-
-```text
-QUESTION
-ANSWER
-AUTHORITY
-ADDITIONAL
-```
-
-Nem todas aparecerão com conteúdo em todas as consultas.
-
-Localize também:
-
-```text
-status
-TTL
-```
-
-O TTL está relacionado a:
-
-____________________________________________________________________
-
----
-
-# Parte 7 — Consulta a servidor específico
-
-Use um servidor indicado pelo professor ou identificado no ambiente:
-
-```bash
-dig @<SERVIDOR-DNS> example.com A
-```
-
-Qual a diferença para:
-
-```bash
-dig example.com A
-```
-
-____________________________________________________________________
-
----
-
-# Parte 8 — Resolução reversa
-
-Escolha um endereço retornado anteriormente:
-
-```bash
-dig -x <ENDERECO-IP>
-```
-
-O tipo de registro utilizado é:
-
-```text
+MAC do cliente:
 ____________________________________
 ```
 
 ---
 
-# Parte 9 — Captura
+# 4. Crie uma reserva
 
-Descubra a interface NAT:
-
-```bash
-ip route show default
-```
-
-Limpe o cache:
+No servidor, edite:
 
 ```bash
-sudo resolvectl flush-caches
+sudo nano /etc/kea/kea-dhcp4.conf
 ```
 
-Capture:
+Dentro da subnet, adicione:
 
-```bash
-sudo tcpdump -i <INTERFACE-NAT> -nn 'port 53'
+```json
+"reservations": [
+  {
+    "hw-address": "MAC_DO_CLIENTE",
+    "ip-address": "192.168.50.50",
+    "hostname": "cliente"
+  }
+]
 ```
 
-Em outro terminal:
-
-```bash
-dig iana.org A
-```
-
-Observe requisição e resposta.
+Atenção à posição das vírgulas no JSON.
 
 ---
 
-# Parte 10 — Salve uma captura
+# 5. Valide novamente
 
 ```bash
-sudo tcpdump -i <INTERFACE-NAT> -nn -c 10 -w aula-09-dns.pcap 'port 53'
+python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
 ```
 
-Gere novas consultas até a captura terminar.
+```bash
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+```
 
-Leia:
+Somente depois:
 
 ```bash
-tcpdump -nn -r aula-09-dns.pcap
+sudo systemctl restart kea-dhcp4-server
 ```
 
 ---
 
-# Parte 11 — Investigação
+# 6. Faça o cliente solicitar novamente
 
-Preencha com consultas reais.
+Uma reserva nova não necessariamente substitui imediatamente um lease ainda válido.
 
-| Item | Resultado resumido |
-|---|---|
-| A de `example.com` | |
-| AAAA de `example.com` | |
-| NS de `example.com` | |
-| MX de `gmail.com` | |
-| PTR de um IP consultado | |
-| TTL de uma resposta | |
+Para o laboratório, o professor poderá orientar a limpeza controlada do lease anterior.
 
----
+Depois, no cliente:
 
-# Parte 12 — Portfólio
+```bash
+sudo networkctl renew lab0
+```
 
-Crie:
+Se necessário:
+
+```bash
+sudo systemctl restart systemd-networkd
+```
+
+A sessão SSH pode cair temporariamente.
+
+No servidor, confirme:
+
+```bash
+sudo tail -n 10 /var/lib/kea/kea-leases4.csv
+```
+
+Resultado esperado para o cliente reservado:
 
 ```text
-dns/aula-09/
-├── README.md
-└── aula-09-dns.pcap
-```
-
-README:
-
-```markdown
-# Aula 09 — Consultas DNS
-
-## Resolvedor do sistema
-
-## Registros consultados
-### A
-### AAAA
-### NS
-### MX
-### CNAME
-### PTR
-
-## TTL
-
-## Captura
-- interface:
-- porta:
-- consulta observada:
-
-## Síntese
-Explique a diferença entre resolver um nome e acessar o serviço associado a ele.
-```
-
-Versione:
-
-```bash
-git add dns/aula-09
-git commit -m "Aula 09 - registra consultas DNS"
-git push
-gh auth logout
+192.168.50.50
 ```
 
 ---
 
-# Próxima aula
+# 7. Verifique as opções entregues
 
-Você configurará `srv-redes2` como servidor autoritativo de:
+No cliente:
+
+```bash
+ip -br addr show lab0
+ip route
+```
+
+Quando disponível:
+
+```bash
+resolvectl status lab0
+```
+
+Observe se o servidor DNS informado pelo DHCP é:
+
+```text
+192.168.50.10
+```
+
+e se o domínio é:
 
 ```text
 empresa.test
+```
+
+O DNS ainda será implantado nas próximas aulas. Hoje estamos verificando apenas a informação entregue pelo DHCP.
+
+---
+
+# 8. Logs e evidências
+
+No servidor:
+
+```bash
+sudo journalctl -u kea-dhcp4-server -n 50 --no-pager
+```
+
+Capture uma nova renovação:
+
+```bash
+sudo tcpdump -i lab0 -nn -vvv \
+  'udp port 67 or udp port 68'
+```
+
+---
+
+# 9. Incidente DHCP
+
+O professor indicará um incidente ou uma condição incorreta.
+
+Utilize:
+
+```text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+```
+
+Ferramentas úteis:
+
+```bash
+systemctl status kea-dhcp4-server
+journalctl -u kea-dhcp4-server
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+sudo ss -lunp
+ip -br addr
+tcpdump
+```
+
+---
+
+# 10. Portfólio
+
+No servidor:
+
+```bash
+cd ~/SEU_REPOSITORIO
+mkdir -p dhcp
+```
+
+Salve a configuração:
+
+```bash
+sudo cat /etc/kea/kea-dhcp4.conf > dhcp/kea-dhcp4.conf
+```
+
+Crie:
+
+```bash
+nano dhcp/README.md
+```
+
+Estrutura sugerida:
+
+```markdown
+# DHCP com Kea
+
+## Rede
+- servidor:
+- rede:
+- pool:
+
+## Cliente
+- MAC:
+- endereço inicialmente recebido:
+- endereço reservado:
+
+## Opções DHCP
+- DNS:
+- domínio:
+
+## Testes
+- serviço:
+- porta:
+- lease:
+- renovação:
+
+## Troubleshooting
+Sintoma:
+Hipótese:
+Teste:
+Evidência:
+Causa:
+Correção:
+Validação:
+```
+
+> Não versione arquivos temporários de lease como se fossem configuração.
+
+---
+
+# 11. Marco DHCP
+
+Confira:
+
+```bash
+git status
+```
+
+Depois:
+
+```bash
+git add dhcp/
+git status
+git commit -m "Implanta e documenta DHCP com Kea"
+git push
+```
+
+---
+
+# Checklist
+
+```text
+[ ] Kea escuta somente na interface de laboratório.
+[ ] pool está correto.
+[ ] cliente obtém endereço por DHCP.
+[ ] identifiquei o lease.
+[ ] criei reserva para o cliente.
+[ ] cliente recebeu 192.168.50.50.
+[ ] DHCP informa DNS 192.168.50.10.
+[ ] DHCP informa domínio empresa.test.
+[ ] usei logs/captura como evidência.
+[ ] documentei e versionei o serviço.
 ```

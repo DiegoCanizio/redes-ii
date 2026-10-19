@@ -107,11 +107,13 @@ No primeiro login, o sistema poderá exigir a troca da senha.
 
 Caso isso ocorra, siga as solicitações exibidas no terminal.
 
-Se quiser alterar a senha posteriormente:
+Para alterar a senha:
 
 ```bash
-passwd
+sudo passwd "$(whoami)"
 ```
+
+Quando o `sudo` solicitar a senha atual, informe a senha utilizada no login.
 
 Escolha uma senha que você consiga lembrar e **não compartilhe com colegas**.
 
@@ -876,7 +878,7 @@ journalctl -u SERVICO
 ### Trocar senha
 
 ```bash
-passwd
+sudo passwd "$(whoami)"
 ```
 
 ---

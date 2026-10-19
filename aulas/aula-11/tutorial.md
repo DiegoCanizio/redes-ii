@@ -1,267 +1,326 @@
-# Avaliação Prática 1 — DHCP + DNS
+# Aula 11 — BIND9: zona direta e reversa
+
+**Data:** 05/11/2026  
+**Duração:** 150 minutos
+
+---
 
 ## Objetivo
 
-Implantar e demonstrar uma infraestrutura funcional de DHCP + DNS a partir de duas VMs Ubuntu Server limpas.
-
-Você deverá configurar, testar e documentar a solução.
-
----
-
-# Cenário
-
-## Rede interna
+Hoje seu servidor se tornará autoritativo pelo domínio:
 
 ```text
-192.168.80.0/24
+empresa.test
 ```
 
-## Servidor
+Topologia:
 
 ```text
-192.168.80.10/24
-```
-
-## Cliente
-
-O endereço da interface interna deverá ser obtido por DHCP.
-
-A interface NAT continuará sendo utilizada para acesso externo.
-
----
-
-# DHCP
-
-Utilize **Kea DHCPv4**.
-
-Pool:
-
-```text
-192.168.80.100–192.168.80.130
-```
-
-Crie uma reserva para a interface interna do cliente:
-
-```text
-192.168.80.50
-```
-
-O DHCP também deverá informar:
-
-```text
-Servidor DNS: 192.168.80.10
-Domínio:       aurora.test
-```
-
-Não configure gateway fictício na rede interna.
-
----
-
-# DNS
-
-Utilize **BIND9**.
-
-Domínio:
-
-```text
-aurora.test
-```
-
-O servidor deve ser autoritativo para a zona direta e para a zona reversa de:
-
-```text
-192.168.80.0/24
-```
-
-Crie registros que permitam demonstrar:
-
-```text
-NS
-A
-CNAME
-MX
-PTR
-```
-
-Nomes mínimos:
-
-```text
-ns1.aurora.test
-srv.aurora.test
-web.aurora.test
-www.aurora.test
-mail.aurora.test
+cli-r2-sNN
+      │
+      │ DNS
+      ▼
+192.168.50.10
+srv-r2-sNN
+      │
+      └── BIND9
 ```
 
 ---
 
-# O que deve ser demonstrado
+# 1. Instale o BIND
 
-## Rede
+No servidor:
 
-- servidor com endereço correto;
-- cliente alcançando servidor;
-- acesso externo preservado pela NAT.
+```bash
+sudo apt update
+sudo apt install -y bind9 bind9-utils dnsutils
+```
 
-## DHCP
+Confira:
 
-- serviço ativo;
-- pool correto;
-- cliente recebendo lease;
-- reserva `192.168.80.50`;
-- DNS/domínio recebidos pelo cliente.
+```bash
+systemctl status bind9
+```
 
-## DNS
+---
 
-Demonstrar consultas equivalentes a:
+# 2. Faça backup
+
+```bash
+sudo cp /etc/bind/named.conf.local \
+  /etc/bind/named.conf.local.bak-aula11
+```
+
+```bash
+sudo cp /etc/bind/named.conf.options \
+  /etc/bind/named.conf.options.bak-aula11
+```
+
+---
+
+# 3. Limite a escuta ao laboratório
+
+Edite:
+
+```bash
+sudo nano /etc/bind/named.conf.options
+```
+
+Dentro de `options { ... };`, configure de forma equivalente a:
 
 ```text
-NS
-A
-CNAME
-MX
-PTR
+listen-on {
+    127.0.0.1;
+    192.168.50.10;
+};
+
+listen-on-v6 { none; };
+
+allow-query {
+    127.0.0.1;
+    192.168.50.0/24;
+};
 ```
 
-Também demonstrar consulta do cliente **sem informar manualmente `@192.168.80.10`**, provando que o DNS foi recebido pela configuração de rede.
+Mantenha as demais opções necessárias do arquivo.
+
+> O objetivo é atender a rede de laboratório, não transformar `host0` em interface de serviço DNS da disciplina.
 
 ---
 
-# Validação
+# 4. Declare a zona direta
 
-Você deverá escolher comandos adequados para comprovar o funcionamento.
+Edite:
 
-Exemplos de tipos de evidência estudados anteriormente:
+```bash
+sudo nano /etc/bind/named.conf.local
+```
+
+Adicione:
+
+```bind
+zone "empresa.test" {
+    type master;
+    file "/etc/bind/db.empresa.test";
+};
+```
+
+---
+
+# 5. Crie a zona direta
+
+```bash
+sudo nano /etc/bind/db.empresa.test
+```
+
+Exemplo:
+
+```dns
+$TTL 3600
+
+@   IN SOA ns.empresa.test. admin.empresa.test. (
+        2026110501
+        3600
+        1800
+        604800
+        86400
+)
+
+@       IN NS      ns.empresa.test.
+@       IN MX 10   mail.empresa.test.
+
+ns      IN A       192.168.50.10
+srv     IN A       192.168.50.10
+mail    IN A       192.168.50.10
+www     IN CNAME   srv.empresa.test.
+```
+
+---
+
+# 6. O serial
+
+O serial deve aumentar quando a zona é alterada.
+
+Nesta disciplina utilizaremos o padrão:
 
 ```text
-estado do serviço
-porta em escuta
-endereço
-rota
-lease
-log
-consulta DNS
+AAAAMMDDNN
 ```
 
-A escolha dos comandos faz parte da avaliação.
-
----
-
-# Incidente
-
-Durante a avaliação, o professor introduzirá ou atribuirá **um incidente**.
-
-Você deverá utilizar:
+Exemplo:
 
 ```text
-Sintoma
-→ Hipótese
-→ Teste
-→ Evidência
-→ Causa
-→ Correção
-→ Validação
+2026110501
 ```
 
-Não altere várias configurações simultaneamente sem produzir evidências.
-
----
-
-# Entrega
-
-No seu portfólio:
+Se alterar novamente no mesmo dia:
 
 ```text
-avaliacoes/
-└── avaliacao-01/
-    ├── README.md
-    ├── kea-dhcp4.conf
-    ├── named.conf.local
-    ├── db.aurora.test
-    └── db.192.168.80
-```
-
-Os nomes dos arquivos podem variar apenas quando justificado pela configuração utilizada.
-
----
-
-# README da avaliação
-
-Registre no mínimo:
-
-```markdown
-# Avaliação Prática 1 — DHCP + DNS
-
-## Rede
-- servidor:
-- cliente:
-- rota externa:
-
-## DHCP
-- pool:
-- reserva:
-- lease:
-- DNS entregue:
-- domínio entregue:
-
-## DNS
-- zona:
-- registros:
-- reverse:
-
-## Testes
-- DHCP:
-- A:
-- CNAME:
-- MX:
-- PTR:
-- consulta integrada:
-
-## Incidente
-
-### Sintoma
-
-### Hipótese
-
-### Teste
-
-### Evidência
-
-### Causa
-
-### Correção
-
-### Validação
+2026110502
 ```
 
 ---
 
-# Critérios
+# 7. Valide a zona direta
 
-| Critério | Pontos |
-|---|---:|
-| Rede e endereçamento | 10 |
-| DHCP funcional e pool correto | 20 |
-| Reserva DHCP | 10 |
-| DNS direto / zona autoritativa | 20 |
-| Reverse + registros adicionais | 10 |
-| Testes e integração DHCP–DNS | 10 |
-| Troubleshooting do incidente | 15 |
-| Organização e documentação | 5 |
-| **Total** | **100** |
+```bash
+sudo named-checkconf
+```
+
+Depois:
+
+```bash
+sudo named-checkzone empresa.test \
+  /etc/bind/db.empresa.test
+```
+
+Somente se estiver correto:
+
+```bash
+sudo systemctl restart bind9
+```
 
 ---
 
-# Importante
+# 8. Teste diretamente o servidor DNS
 
-A avaliação não mede apenas se a configuração final funciona.
+```bash
+dig @192.168.50.10 empresa.test NS
+```
 
-Também serão observados:
+```bash
+dig @192.168.50.10 srv.empresa.test A
+```
 
-- validação antes de reiniciar serviços;
-- escolha dos testes;
-- interpretação das evidências;
-- capacidade de diagnosticar;
-- organização dos artefatos.
+```bash
+dig @192.168.50.10 www.empresa.test CNAME
+```
 
-Ao concluir, faça o commit e o push de sua entrega conforme orientação do professor e encerre sua autenticação GitHub.
+```bash
+dig @192.168.50.10 empresa.test MX
+```
+
+---
+
+# 9. Zona reversa
+
+Para a rede:
+
+```text
+192.168.50.0/24
+```
+
+a zona reversa será:
+
+```text
+50.168.192.in-addr.arpa
+```
+
+Adicione em:
+
+```text
+/etc/bind/named.conf.local
+```
+
+```bind
+zone "50.168.192.in-addr.arpa" {
+    type master;
+    file "/etc/bind/db.192.168.50";
+};
+```
+
+---
+
+# 10. Crie o arquivo reverso
+
+```bash
+sudo nano /etc/bind/db.192.168.50
+```
+
+Exemplo:
+
+```dns
+$TTL 3600
+
+@   IN SOA ns.empresa.test. admin.empresa.test. (
+        2026110501
+        3600
+        1800
+        604800
+        86400
+)
+
+@       IN NS      ns.empresa.test.
+
+10      IN PTR     srv.empresa.test.
+50      IN PTR     cliente.empresa.test.
+```
+
+---
+
+# 11. Valide a zona reversa
+
+```bash
+sudo named-checkzone 50.168.192.in-addr.arpa \
+  /etc/bind/db.192.168.50
+```
+
+Depois:
+
+```bash
+sudo systemctl reload bind9
+```
+
+Teste:
+
+```bash
+dig @192.168.50.10 -x 192.168.50.10
+```
+
+---
+
+# 12. Portas e logs
+
+```bash
+sudo ss -lunp | grep ':53'
+sudo ss -lntp | grep ':53'
+```
+
+Logs:
+
+```bash
+sudo journalctl -u bind9 -n 30 --no-pager
+```
+
+---
+
+# 13. Capture uma consulta
+
+Servidor:
+
+```bash
+sudo tcpdump -i lab0 -nn 'port 53'
+```
+
+A partir do cliente ou de outro terminal:
+
+```bash
+dig @192.168.50.10 www.empresa.test
+```
+
+Observe a requisição e a resposta.
+
+---
+
+# 14. Ainda não conclua o commit
+
+Na próxima aula, o cliente utilizará o BIND automaticamente por meio das informações entregues pelo DHCP.
+
+Por enquanto, deixe preparados no portfólio:
+
+```text
+dns/
+```
+
+O marco será concluído após a integração.

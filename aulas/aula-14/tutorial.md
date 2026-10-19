@@ -1,291 +1,312 @@
-# Aula 14 — HTTPS, TLS e certificados
+# Aula 14 — Laboratório integrado e checkpoint
+
+**Data:** 17/11/2026  
+**Duração:** 100 minutos
+
+---
 
 ## Objetivo
 
-Transformar:
+Hoje não será apresentado um novo serviço.
+
+O objetivo é verificar se você consegue operar a infraestrutura construída nas aulas anteriores **sem um roteiro de configuração passo a passo**.
+
+Estado esperado:
 
 ```text
-http://web.empresa.test
-```
-
-em:
-
-```text
-https://web.empresa.test
-```
-
-usando TLS e um certificado autoassinado de laboratório.
-
----
-
-# Bloco 0
-
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y nginx openssl tcpdump
-```
-
-Cliente:
-
-```bash
-sudo apt update
-sudo apt install -y curl openssl tcpdump git gh
-```
-
-Reconstrua o site `web.empresa.test` da Aula 13.
-
-Prepare seu portfólio.
-
----
-
-# Parte 1 — Gere chave e certificado
-
-Servidor:
-
-```bash
-sudo openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout /etc/ssl/private/web.empresa.test.key \
-  -out /etc/ssl/certs/web.empresa.test.crt \
-  -days 30 \
-  -subj "/CN=web.empresa.test" \
-  -addext "subjectAltName=DNS:web.empresa.test"
-```
-
-Proteja a chave:
-
-```bash
-sudo chmod 600 /etc/ssl/private/web.empresa.test.key
+cli-r2-sNN
+      │
+      │ DHCP
+      ▼
+recebe configuração de rede
+      │
+      │ DNS
+      ▼
+www.empresa.test → 192.168.50.10
+      │
+      │ HTTP
+      ▼
+Nginx responde
 ```
 
 ---
 
-# Parte 2 — Diferencie os arquivos
+# Regras
 
-Complete:
+Você pode consultar:
 
-```text
-.key:
-____________________________________________________________
+- seus próprios arquivos;
+- seu portfólio;
+- materiais desta disciplina;
+- `man`;
+- `--help`.
 
-.crt:
-____________________________________________________________
+O professor não indicará imediatamente qual arquivo deve ser alterado.
+
+Utilize evidências.
+
+---
+
+# 1. Verificação inicial
+
+Sem modificar nada, registre o estado atual.
+
+## Servidor
+
+```bash
+hostname
+ip -br addr
+ip route
+systemctl --failed
 ```
 
-Qual deles nunca deve ser publicado?
+Serviços:
 
-```text
-____________________________________
+```bash
+systemctl is-active kea-dhcp4-server
+systemctl is-active bind9
+systemctl is-active nginx
+```
+
+Portas:
+
+```bash
+sudo ss -lntup
+```
+
+## Cliente
+
+```bash
+hostname
+ip -br addr
+ip route
+```
+
+Teste:
+
+```bash
+getent hosts www.empresa.test
+curl -I http://www.empresa.test/
 ```
 
 ---
 
-# Parte 3 — Inspecione o certificado
+# 2. O professor aplicará um incidente
 
-```bash
-openssl x509 -in /etc/ssl/certs/web.empresa.test.crt \
-  -noout -subject -issuer -dates -ext subjectAltName
-```
+Seu ambiente poderá conter uma falha relacionada a conteúdo já trabalhado.
 
-Registre:
+Possíveis áreas:
 
 ```text
-Subject:
-____________________________________________________________
-
-Issuer:
-____________________________________________________________
-
-Validade:
-____________________________________________________________
+endereçamento
+DHCP
+DNS
+HTTP
+serviço
+porta
+arquivo de configuração
 ```
+
+Não será informado antecipadamente onde está a falha.
 
 ---
 
-# Parte 4 — Configure Nginx
+# 3. Diagnostique
 
-Edite o site:
+Utilize:
 
-```nginx
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-
-    server_name web.empresa.test;
-
-    root /var/www/web;
-    index index.html;
-
-    ssl_certificate /etc/ssl/certs/web.empresa.test.crt;
-    ssl_certificate_key /etc/ssl/private/web.empresa.test.key;
-}
+```text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
 ```
 
-Valide:
+Ferramentas disponíveis incluem:
 
 ```bash
+ip -br addr
+ip route
+ip neigh
+ping
+getent
+dig
+ss
+systemctl
+journalctl
+tcpdump
+kea-dhcp4 -t
+named-checkconf
+named-checkzone
+nginx -t
+curl
+```
+
+Nem todas são necessárias em todos os incidentes.
+
+---
+
+# 4. Regra de ouro
+
+Antes de reiniciar um serviço, pergunte:
+
+```text
+Existe uma forma de validar a configuração primeiro?
+```
+
+Exemplos:
+
+```bash
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+sudo named-checkconf
+sudo named-checkzone ...
 sudo nginx -t
+```
+
+---
+
+# 5. Estado final obrigatório
+
+Ao terminar:
+
+## Rede
+
+O servidor deve manter:
+
+```text
+lab0: 192.168.50.10/24
+```
+
+O cliente deverá obter sua configuração conforme o DHCP vigente.
+
+## DHCP
+
+```text
+kea-dhcp4-server → active
+```
+
+O cliente deve possuir lease válido.
+
+## DNS
+
+Devem funcionar:
+
+```text
+srv.empresa.test
+www.empresa.test
+```
+
+## HTTP
+
+Do cliente:
+
+```bash
+curl http://www.empresa.test/
+```
+
+deve retornar a página configurada na Aula 13.
+
+---
+
+# 6. Documente o incidente
+
+No portfólio:
+
+```bash
+mkdir -p checkpoint
+nano checkpoint/primeira-unidade.md
+```
+
+Use:
+
+```markdown
+# Checkpoint — primeira unidade
+
+## Estado inicial
+O que funcionava antes do incidente?
+
+## Sintoma
+O que deixou de funcionar?
+
+## Hipótese inicial
+
+## Testes realizados
+
+### Teste 1
+Comando:
+Resultado:
+Interpretação:
+
+### Teste 2
+Comando:
+Resultado:
+Interpretação:
+
+## Causa
+
+## Correção
+
+## Validação final
+
+### DHCP
+
+### DNS
+
+### HTTP
+
+## O que eu faria diferente
+```
+
+---
+
+# 7. Atualize o portfólio
+
+Este checkpoint pode atualizar as evidências dos marcos anteriores.
+
+Confira:
+
+```bash
+git status
 ```
 
 Depois:
 
 ```bash
-sudo systemctl reload nginx
-```
-
-Verifique:
-
-```bash
-ss -lntp | grep ':443'
-```
-
----
-
-# Parte 5 — Teste a confiança
-
-Cliente:
-
-```bash
-curl -v --resolve web.empresa.test:443:192.168.50.10 \
-  https://web.empresa.test/
-```
-
-Registre o erro:
-
-____________________________________________________________________
-
-Por que ocorreu?
-
-____________________________________________________________________
-
----
-
-# Parte 6 — Teste conscientemente ignorando confiança
-
-```bash
-curl -vk --resolve web.empresa.test:443:192.168.50.10 \
-  https://web.empresa.test/
-```
-
-A página deve aparecer.
-
-`-k` significa que o cliente:
-
-____________________________________________________________________
-
----
-
-# Parte 7 — Observe TLS
-
-```bash
-openssl s_client \
-  -connect 192.168.50.10:443 \
-  -servername web.empresa.test
-```
-
-Procure:
-
-```text
-subject
-issuer
-cipher
-Verify return code
-```
-
----
-
-# Parte 8 — Capture
-
-Servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A 'tcp port 443'
-```
-
-Cliente:
-
-```bash
-curl -sk --resolve web.empresa.test:443:192.168.50.10 \
-  https://web.empresa.test/
-```
-
-Pergunta:
-
-### Você conseguiu ler diretamente o HTML como no HTTP da Aula 12?
-
-```text
-☐ Sim
-☐ Não
-```
-
----
-
-# Parte 9 — Proteja seu Git
-
-No diretório da Aula 14, crie ou atualize `.gitignore`:
-
-```gitignore
-*.key
-```
-
-**Não copie a chave privada para o portfólio.**
-
----
-
-# Parte 10 — Portfólio
-
-```text
-web/aula-14/
-├── README.md
-├── web-https.nginx
-└── web.empresa.test.crt
-```
-
-O `.crt` é público e pode ser incluído para fins didáticos. A `.key` não.
-
-README:
-
-```markdown
-# Aula 14 — HTTPS/TLS
-
-## Certificado
-- subject:
-- issuer:
-- SAN:
-- validade:
-
-## Chave privada
-Explique por que não deve ser versionada.
-
-## Nginx
-- porta:
-- validação:
-
-## Cliente
-- resultado sem `-k`:
-- resultado com `-k`:
-
-## TLS
-- cipher/protocolo observado:
-
-## Comparação HTTP × HTTPS
-```
-
-Versione:
-
-```bash
-git add web/aula-14
+git add checkpoint/
 git status
-git commit -m "Aula 14 - configura HTTPS com TLS"
+git commit -m "Registra checkpoint integrado da primeira unidade"
 git push
-gh auth logout
 ```
-
-Confirme antes do commit que nenhum `.key` foi adicionado.
 
 ---
 
-# Próxima aula
+# 8. Autoavaliação
 
-Logs, backend e proxy reverso.
+Marque:
+
+```text
+[ ] Consigo diferenciar falha de rede e falha de serviço.
+[ ] Sei verificar se um serviço está ativo.
+[ ] Sei verificar se uma porta está aberta.
+[ ] Sei validar Kea antes de reiniciar.
+[ ] Sei validar BIND antes de reiniciar.
+[ ] Sei validar Nginx antes de recarregar.
+[ ] Sei testar DNS de forma explícita.
+[ ] Sei testar a resolução normal do cliente.
+[ ] Sei consultar logs.
+[ ] Sei usar tcpdump quando preciso observar tráfego.
+[ ] Consigo documentar causa, correção e validação.
+```
+
+Se algum item ainda estiver inseguro, utilize este encontro para revisar seu próprio ambiente e suas evidências.
+
+---
+
+# Próximo encontro
+
+A próxima etapa será a **Avaliação 1**.
+
+O detalhamento da avaliação será disponibilizado separadamente.

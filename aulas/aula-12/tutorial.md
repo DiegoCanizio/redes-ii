@@ -1,152 +1,208 @@
-# Aula 12 — HTTP por dentro
+# Aula 12 — Integração DHCP + DNS
 
-## Objetivo
+**Data:** 10/11/2026  
+**Duração:** 100 minutos
 
-Hoje você observará HTTP antes de configurar Nginx.
+---
 
-Rede:
+## Situação-problema
 
-```text
-srv-redes2 → 192.168.50.10/24
-cli-redes2 → 192.168.50.20/24
+Até agora sabemos testar DNS explicitamente:
+
+```bash
+dig @192.168.50.10 www.empresa.test
 ```
 
-Servidor HTTP da aula:
+Mas um usuário não deveria precisar informar manualmente o servidor DNS em cada comando.
+
+Hoje a rede deverá funcionar assim:
 
 ```text
-TCP/8000
+cliente
+   │
+   │ DHCP
+   ▼
+recebe:
+- endereço IPv4
+- servidor DNS = 192.168.50.10
+- domínio = empresa.test
+   │
+   ▼
+BIND9
+   │
+   ▼
+www.empresa.test
 ```
 
 ---
 
-# Bloco 0
-
-## Servidor
-
-```bash
-sudo apt update
-sudo apt install -y python3 tcpdump iproute2
-```
-
-## Cliente
-
-```bash
-sudo apt update
-sudo apt install -y curl netcat-openbsd tcpdump git gh
-```
-
-Prepare seu portfólio.
-
----
-
-# Parte 1 — Crie uma página
+# 1. Confirme os serviços
 
 No servidor:
 
 ```bash
-mkdir -p ~/http-aula12
-cd ~/http-aula12
-nano index.html
+systemctl is-active kea-dhcp4-server
+systemctl is-active bind9
 ```
 
-Conteúdo:
+Confira portas:
 
-```html
-<!doctype html>
-<html>
-  <head><title>Redes II</title></head>
-  <body>
-    <h1>HTTP funcionando</h1>
-    <p>Aula 12 - Redes de Computadores II</p>
-  </body>
-</html>
+```bash
+sudo ss -lunp | grep -E ':67|:53'
 ```
 
 ---
 
-# Parte 2 — Inicie o servidor
+# 2. Revise as opções do DHCP
 
-```bash
-python3 -m http.server 8000 --bind 192.168.50.10
+No arquivo:
+
+```text
+/etc/kea/kea-dhcp4.conf
 ```
 
-Mantenha o terminal aberto.
+confirme:
 
-Em outro terminal:
+```json
+{
+  "name": "domain-name-servers",
+  "data": "192.168.50.10"
+}
+```
+
+e:
+
+```json
+{
+  "name": "domain-name",
+  "data": "empresa.test"
+}
+```
+
+Valide:
 
 ```bash
-ss -lntp | grep ':8000'
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
 ```
 
 ---
 
-# Parte 3 — Teste com curl
+# 3. Renove o cliente
 
 No cliente:
 
 ```bash
-curl http://192.168.50.10:8000/
+sudo networkctl renew lab0
+```
+
+Se necessário:
+
+```bash
+sudo systemctl restart systemd-networkd
 ```
 
 Depois:
 
 ```bash
-curl -I http://192.168.50.10:8000/
+ip -br addr show lab0
 ```
 
-Registre o status:
+Quando disponível:
 
-```text
-____________________________________
+```bash
+resolvectl status lab0
+```
+
+Também observe:
+
+```bash
+cat /etc/resolv.conf
 ```
 
 ---
 
-# Parte 4 — Veja a conversa HTTP
+# 4. Teste sem `@SERVIDOR`
+
+No cliente:
 
 ```bash
-curl -v http://192.168.50.10:8000/
+getent hosts srv.empresa.test
 ```
 
-Observe:
+Depois:
 
-```text
-> requisição
-< resposta
+```bash
+getent hosts www.empresa.test
 ```
 
-Localize:
+Se `dig` estiver disponível:
+
+```bash
+dig www.empresa.test
+```
+
+Agora **não informe**:
 
 ```text
-GET /
-Host:
-HTTP/... 200
+@192.168.50.10
+```
+
+O objetivo é provar que o cliente está utilizando sua configuração normal de resolução.
+
+---
+
+# 5. Teste o domínio de busca
+
+Tente:
+
+```bash
+getent hosts srv
+```
+
+e:
+
+```bash
+getent hosts www
+```
+
+Dependendo da configuração do resolver, o domínio de busca recebido poderá permitir a expansão para:
+
+```text
+srv.empresa.test
+www.empresa.test
+```
+
+Registre o comportamento observado.
+
+---
+
+# 6. Resolução reversa
+
+No cliente, se `dig` estiver disponível:
+
+```bash
+dig -x 192.168.50.10
+```
+
+Ou consulte a partir do servidor DNS:
+
+```bash
+dig @192.168.50.10 -x 192.168.50.10
 ```
 
 ---
 
-# Parte 5 — Recurso inexistente
+# 7. Teste integrado
+
+No cliente:
 
 ```bash
-curl -v http://192.168.50.10:8000/arquivo-que-nao-existe
-```
-
-Código:
-
-```text
-____________________________________
+ping -c 3 srv.empresa.test
 ```
 
 Pergunta:
 
-### O servidor respondeu?
-
-```text
-☐ Sim
-☐ Não
-```
-
-### Então um 404 significa que a rede está fora?
+### O `ping` testa somente DNS?
 
 ```text
 ☐ Sim
@@ -155,160 +211,136 @@ Pergunta:
 
 Explique:
 
-____________________________________________________________________
+```text
+____________________________________________________________
+```
+
+O nome precisa primeiro ser resolvido; depois ocorre o teste ICMP.
 
 ---
 
-# Parte 6 — Faça uma requisição manual
+# 8. Incidente integrado
 
-```bash
-nc 192.168.50.10 8000
-```
+O professor indicará uma condição incorreta.
 
-Digite:
+O sintoma poderá envolver:
 
 ```text
-GET / HTTP/1.1
-Host: 192.168.50.10
-Connection: close
-
+DHCP
+DNS
+ou a relação entre os dois
 ```
 
-Depois de `Connection: close`, deixe uma linha em branco.
+Não suponha a causa.
 
-Observe a resposta.
-
----
-
-# Parte 7 — Capture HTTP
-
-No servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A 'tcp port 8000'
-```
-
-No cliente:
-
-```bash
-curl http://192.168.50.10:8000/
-```
-
-Procure conteúdo legível na captura.
-
-Pergunta:
-
-### O conteúdo HTTP apareceu em texto claro?
+Utilize o método:
 
 ```text
-☐ Sim
-☐ Não
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
 ```
 
----
-
-# Parte 8 — Salve uma captura
-
-Servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -c 30 \
-  -w aula-12-http.pcap 'tcp port 8000'
-```
-
-Cliente:
-
-```bash
-curl http://192.168.50.10:8000/
-```
-
----
-
-# Parte 9 — Compare dois problemas
-
-## Caso A
-
-```bash
-curl -v http://192.168.50.10:8000/inexistente.html
-```
-
-Resultado:
+Perguntas úteis:
 
 ```text
-____________________________________
+O cliente tem endereço?
+Qual endereço recebeu?
+Qual DNS recebeu?
+O BIND está ativo?
+A porta 53 está aberta?
+A zona é válida?
+A consulta explícita funciona?
+A consulta normal do sistema funciona?
 ```
-
-## Caso B
-
-Pare o servidor Python com `Ctrl+C`.
-
-Depois, no cliente:
-
-```bash
-curl -v http://192.168.50.10:8000/
-```
-
-Resultado:
-
-```text
-____________________________________
-```
-
-Explique a diferença:
-
-____________________________________________________________________
-
-____________________________________________________________________
 
 ---
 
-# Parte 10 — Portfólio
+# 9. Portfólio
+
+Salve:
+
+```bash
+cd ~/SEU_REPOSITORIO
+mkdir -p dns
+```
+
+```bash
+sudo cat /etc/bind/named.conf.local > dns/named.conf.local
+sudo cat /etc/bind/named.conf.options > dns/named.conf.options
+sudo cat /etc/bind/db.empresa.test > dns/db.empresa.test
+sudo cat /etc/bind/db.192.168.50 > dns/db.192.168.50
+```
 
 Crie:
 
-```text
-web/aula-12/
-├── README.md
-└── aula-12-http.pcap
+```bash
+nano dns/README.md
 ```
 
-README sugerido:
+Inclua:
 
 ```markdown
-# Aula 12 — HTTP
+# DNS e integração com DHCP
 
-## Servidor
-- endereço:
-- porta:
+## Zona
+- domínio:
+- servidor DNS:
 
-## Requisição observada
+## Registros
+- NS:
+- A:
+- CNAME:
+- MX:
+- PTR:
 
-## Resposta observada
+## Integração DHCP
+- opção DNS:
+- domínio:
+- endereço do cliente:
 
-## Códigos
-- 200:
-- 404:
+## Testes
+- consulta explícita:
+- consulta normal do cliente:
+- reversa:
 
-## Diagnóstico
-Explique a diferença entre:
-- recurso inexistente;
-- serviço HTTP indisponível.
-
-## Captura
-O que foi possível ler em texto claro?
-```
-
-Versione:
-
-```bash
-git add web/aula-12
-git commit -m "Aula 12 - registra funcionamento do HTTP"
-git push
-gh auth logout
+## Troubleshooting
+Sintoma:
+Hipótese:
+Teste:
+Evidência:
+Causa:
+Correção:
+Validação:
 ```
 
 ---
 
-# Próxima aula
+# 10. Marco DNS + integração
 
-Nginx, virtual hosts e nomes DNS.
+```bash
+git status
+git add dns/
+git status
+git commit -m "Implanta DNS e integra resolucao ao DHCP"
+git push
+```
+
+---
+
+# Checklist
+
+```text
+[ ] Kea está ativo.
+[ ] BIND está ativo.
+[ ] DHCP informa 192.168.50.10 como DNS.
+[ ] empresa.test está configurada.
+[ ] zona reversa funciona.
+[ ] cliente resolve nomes sem informar @192.168.50.10.
+[ ] documentei evidências.
+[ ] concluí o marco DNS + integração.
+```

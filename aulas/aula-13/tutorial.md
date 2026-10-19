@@ -1,15 +1,68 @@
-# Aula 13 — Nginx, virtual hosts e DNS
+# Aula 13 — HTTP, Nginx e logs
 
-## Objetivo
+**Data:** 12/11/2026  
+**Duração:** 150 minutos
 
-Você hospedará dois sites no mesmo servidor:
+---
+
+## Situação-problema
+
+A infraestrutura já possui:
 
 ```text
-web.empresa.test
-intranet.empresa.test
+rede
++
+DHCP
++
+DNS
 ```
 
-ambos em:
+Hoje adicionaremos um serviço de aplicação:
+
+```text
+cli-r2-sNN
+      │
+      │ http://www.empresa.test
+      ▼
+DNS resolve para 192.168.50.10
+      │
+      ▼
+Nginx
+      │
+      ▼
+página web
+```
+
+---
+
+# Objetivos
+
+- compreender requisição e resposta HTTP;
+- instalar e configurar Nginx;
+- usar um nome DNS para acessar o serviço;
+- validar a configuração antes do reload;
+- interpretar códigos HTTP;
+- consultar logs;
+- observar HTTP em texto claro.
+
+---
+
+# 1. Confirme a base
+
+No servidor:
+
+```bash
+systemctl is-active kea-dhcp4-server
+systemctl is-active bind9
+```
+
+No cliente:
+
+```bash
+getent hosts www.empresa.test
+```
+
+O nome deverá apontar para:
 
 ```text
 192.168.50.10
@@ -17,295 +70,406 @@ ambos em:
 
 ---
 
-# Bloco 0
+# 2. Instale o Nginx
 
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y nginx bind9 bind9-utils dnsutils
-```
-
-Cliente:
+No servidor:
 
 ```bash
 sudo apt update
-sudo apt install -y curl dnsutils git gh
+sudo apt install -y nginx
 ```
 
-Prepare seu portfólio.
-
----
-
-# Parte 1 — Verifique o Nginx
+Confira:
 
 ```bash
 systemctl status nginx
 ```
 
+Porta:
+
 ```bash
-ss -lntp | grep ':80'
+sudo ss -lntp | grep ':80'
 ```
+
+---
+
+# 3. Teste pelo endereço IP
 
 No cliente:
 
 ```bash
-curl http://192.168.50.10/
-```
-
----
-
-# Parte 2 — Crie os sites
-
-Servidor:
-
-```bash
-sudo mkdir -p /var/www/web /var/www/intranet
-```
-
-```bash
-echo '<h1>Web - empresa.test</h1>' | \
-  sudo tee /var/www/web/index.html
-```
-
-```bash
-echo '<h1>Intranet - empresa.test</h1>' | \
-  sudo tee /var/www/intranet/index.html
-```
-
----
-
-# Parte 3 — Site `web`
-
-```bash
-sudo nano /etc/nginx/sites-available/web.empresa.test
-```
-
-```nginx
-server {
-    listen 80;
-    listen [::]:80;
-
-    server_name web.empresa.test;
-
-    root /var/www/web;
-    index index.html;
-}
-```
-
----
-
-# Parte 4 — Site `intranet`
-
-```bash
-sudo nano /etc/nginx/sites-available/intranet.empresa.test
-```
-
-```nginx
-server {
-    listen 80;
-    listen [::]:80;
-
-    server_name intranet.empresa.test;
-
-    root /var/www/intranet;
-    index index.html;
-}
-```
-
----
-
-# Parte 5 — Habilite
-
-```bash
-sudo ln -s /etc/nginx/sites-available/web.empresa.test /etc/nginx/sites-enabled/
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/intranet.empresa.test /etc/nginx/sites-enabled/
-```
-
-```bash
-sudo rm -f /etc/nginx/sites-enabled/default
-```
-
-Valide:
-
-```bash
-sudo nginx -t
-```
-
-Se estiver correto:
-
-```bash
-sudo systemctl reload nginx
-```
-
----
-
-# Parte 6 — Teste sem depender do DNS
-
-Cliente:
-
-```bash
-curl --resolve web.empresa.test:80:192.168.50.10 \
-  http://web.empresa.test/
-```
-
-```bash
-curl --resolve intranet.empresa.test:80:192.168.50.10 \
-  http://intranet.empresa.test/
-```
-
-As respostas devem ser diferentes.
-
----
-
-# Parte 7 — O que diferenciou os sites?
-
-Use:
-
-```bash
-curl -v --resolve web.empresa.test:80:192.168.50.10 \
-  http://web.empresa.test/
-```
-
-Observe:
-
-```text
-Host: web.empresa.test
-```
-
-Explique:
-
-____________________________________________________________________
-
----
-
-# Parte 8 — Integre ao DNS
-
-Na zona `empresa.test`, adicione:
-
-```dns
-web       IN A 192.168.50.10
-intranet  IN A 192.168.50.10
-```
-
-Atualize o serial.
-
-Valide:
-
-```bash
-sudo named-checkzone empresa.test /etc/bind/db.empresa.test
+curl -I http://192.168.50.10/
 ```
 
 Depois:
 
 ```bash
-sudo systemctl reload bind9
+curl -v http://192.168.50.10/
 ```
 
-Cliente:
+Observe:
 
-```bash
-dig @192.168.50.10 web.empresa.test
-dig @192.168.50.10 intranet.empresa.test
-```
-
----
-
-# Parte 9 — Logs
-
-Servidor:
-
-```bash
-sudo tail -f /var/log/nginx/access.log
-```
-
-No cliente, faça requisições.
-
-Depois observe:
-
-```bash
-sudo tail -n 20 /var/log/nginx/error.log
+```text
+> GET
+> Host:
+< HTTP/...
 ```
 
 ---
 
-# Parte 10 — Incidente
+# 4. Crie o site da disciplina
 
-O professor introduzirá uma inconsistência entre DNS e `server_name`.
-
-Use evidências:
+No servidor:
 
 ```bash
-dig @192.168.50.10 ...
-curl -v --resolve ...
+sudo mkdir -p /var/www/empresa
+```
+
+Crie:
+
+```bash
+sudo nano /var/www/empresa/index.html
+```
+
+Exemplo:
+
+```html
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>empresa.test</title>
+</head>
+<body>
+  <h1>Redes de Computadores II</h1>
+  <p>Servidor: srv-r2-sNN</p>
+  <p>Site: www.empresa.test</p>
+</body>
+</html>
+```
+
+Substitua `NN` pelo número do seu ambiente.
+
+---
+
+# 5. Configure o virtual host
+
+Crie:
+
+```bash
+sudo nano /etc/nginx/sites-available/www.empresa.test
+```
+
+Conteúdo:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name www.empresa.test;
+
+    root /var/www/empresa;
+    index index.html;
+
+    access_log /var/log/nginx/empresa-access.log;
+    error_log  /var/log/nginx/empresa-error.log;
+}
+```
+
+---
+
+# 6. Habilite o site
+
+```bash
+sudo ln -s \
+  /etc/nginx/sites-available/www.empresa.test \
+  /etc/nginx/sites-enabled/www.empresa.test
+```
+
+Remova o default, se orientado:
+
+```bash
+sudo rm -f /etc/nginx/sites-enabled/default
+```
+
+---
+
+# 7. Valide antes do reload
+
+```bash
 sudo nginx -t
-sudo nginx -T
+```
+
+Somente se estiver correto:
+
+```bash
+sudo systemctl reload nginx
+```
+
+Confira:
+
+```bash
+systemctl is-active nginx
+sudo ss -lntp | grep ':80'
+```
+
+---
+
+# 8. Acesse pelo nome
+
+No cliente:
+
+```bash
+curl -v http://www.empresa.test/
+```
+
+O fluxo agora depende de:
+
+```text
+DHCP
+→ configuração do cliente
+
+DNS
+→ nome para endereço
+
+HTTP/Nginx
+→ resposta da aplicação
+```
+
+---
+
+# 9. Código 200
+
+Somente cabeçalhos:
+
+```bash
+curl -I http://www.empresa.test/
 ```
 
 Registre:
 
 ```text
-Sintoma:
-____________________________________________________________
-
-Evidência:
-____________________________________________________________
-
-Causa:
-____________________________________________________________
-
-Correção:
-____________________________________________________________
+Status:
+____________________________________
 ```
 
 ---
 
-# Parte 11 — Portfólio
+# 10. Código 404
 
-```text
-web/aula-13/
-├── README.md
-├── web.empresa.test.nginx
-└── intranet.empresa.test.nginx
-```
-
-README:
-
-```markdown
-# Aula 13 — Nginx e virtual hosts
-
-## Sites
-- web.empresa.test:
-- intranet.empresa.test:
-
-## DNS
-
-## Cabeçalho Host
-Explique seu papel.
-
-## Validação
-- nginx -t:
-- testes HTTP:
-
-## Logs
-
-## Incidente
-```
-
-Versione:
+No cliente:
 
 ```bash
-git add web/aula-13
-git commit -m "Aula 13 - configura virtual hosts Nginx"
-git push
-gh auth logout
+curl -v http://www.empresa.test/arquivo-que-nao-existe
+```
+
+Pergunta:
+
+### Um `404` significa que a rede está fora?
+
+```text
+☐ Sim
+☐ Não
+```
+
+Explique:
+
+```text
+____________________________________________________________
+```
+
+Se o servidor respondeu `404`, várias etapas anteriores já funcionaram.
+
+---
+
+# 11. Observe logs
+
+No servidor:
+
+```bash
+sudo tail -f /var/log/nginx/empresa-access.log
+```
+
+Em outro terminal do cliente:
+
+```bash
+curl http://www.empresa.test/
+```
+
+Depois teste um recurso inexistente:
+
+```bash
+curl http://www.empresa.test/nao-existe
+```
+
+Observe as linhas adicionadas.
+
+Erro:
+
+```bash
+sudo tail -n 20 /var/log/nginx/empresa-error.log
 ```
 
 ---
 
-# Próxima aula
+# 12. Faça uma requisição manual
 
-HTTPS, TLS e certificados.
+No cliente, se `nc` estiver disponível:
+
+```bash
+nc www.empresa.test 80
+```
+
+Digite:
+
+```text
+GET / HTTP/1.1
+Host: www.empresa.test
+Connection: close
+
+```
+
+Depois da linha `Connection: close`, deixe uma linha em branco.
+
+Observe a resposta HTTP.
+
+---
+
+# 13. Capture HTTP
+
+No servidor:
+
+```bash
+sudo tcpdump -i lab0 -nn -A 'tcp port 80'
+```
+
+No cliente:
+
+```bash
+curl http://www.empresa.test/
+```
+
+Pergunta:
+
+### O conteúdo HTTP aparece em texto claro?
+
+```text
+☐ Sim
+☐ Não
+```
+
+Esse resultado será importante quando estudarmos HTTPS/TLS.
+
+---
+
+# 14. Troubleshooting orientado por camadas
+
+Se:
+
+```bash
+curl http://www.empresa.test/
+```
+
+falhar, evite começar pelo Nginx automaticamente.
+
+Investigue:
+
+```text
+1. cliente possui IP?
+2. cliente conhece o DNS?
+3. nome resolve?
+4. servidor responde?
+5. Nginx está ativo?
+6. porta 80 está em LISTEN?
+7. configuração passou no nginx -t?
+8. logs mostram erro?
+```
+
+---
+
+# 15. Portfólio
+
+No servidor:
+
+```bash
+cd ~/SEU_REPOSITORIO
+mkdir -p http
+```
+
+Salve:
+
+```bash
+sudo cat /etc/nginx/sites-available/www.empresa.test \
+  > http/www.empresa.test.nginx
+```
+
+```bash
+sudo cat /var/www/empresa/index.html \
+  > http/index.html
+```
+
+Crie:
+
+```bash
+nano http/README.md
+```
+
+Estrutura:
+
+```markdown
+# HTTP com Nginx
+
+## Serviço
+- nome:
+- endereço:
+- porta:
+
+## DNS
+- nome utilizado:
+- endereço resolvido:
+
+## Testes
+- nginx -t:
+- porta:
+- HTTP 200:
+- HTTP 404:
+
+## Logs
+- access:
+- error:
+
+## Captura
+O conteúdo apareceu em texto claro?
+
+## Conclusão
+Explique o caminho cliente → DNS → Nginx.
+```
+
+---
+
+# 16. Marco HTTP
+
+```bash
+git status
+git add http/
+git status
+git commit -m "Implanta HTTP com Nginx integrado ao DNS"
+git push
+```
+
+---
+
+# Checklist
+
+```text
+[ ] www.empresa.test resolve para 192.168.50.10.
+[ ] Nginx está ativo.
+[ ] porta 80 está em LISTEN.
+[ ] nginx -t não apresenta erro.
+[ ] cliente acessa http://www.empresa.test.
+[ ] observei 200 e 404.
+[ ] consultei access.log e error.log.
+[ ] capturei HTTP.
+[ ] concluí o marco HTTP no portfólio.
+```

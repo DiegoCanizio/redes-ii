@@ -131,15 +131,17 @@ Digite a senha inicial.
 
 # Parte 3 — Troque a senha inicial
 
-O sistema poderá exigir a alteração imediatamente.
-
-Se necessário, também é possível utilizar:
+Após entrar, altere sua senha com:
 
 ```bash
-passwd
+sudo passwd "$(whoami)"
 ```
 
-Depois da troca, a nova senha é pessoal.
+Quando o `sudo` solicitar a senha, informe a senha temporária utilizada no login.
+
+Depois escolha sua nova senha e confirme-a.
+
+> A nova senha é pessoal. Não a registre no GitHub e não a compartilhe.
 
 ---
 

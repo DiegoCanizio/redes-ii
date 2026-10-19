@@ -1,362 +1,265 @@
-# Aula 10 — Servidor DNS com BIND9 e integração com DHCP
+# Aula 10 — DNS: resolução de nomes e `dig`
 
-## Objetivo
+**Data:** 03/11/2026  
+**Duração:** 100 minutos
 
-Hoje `srv-redes2` se tornará servidor DNS autoritativo para:
+---
+
+## Situação-problema
+
+Até agora acessamos serviços principalmente por endereço IP.
+
+Humanos preferem nomes:
 
 ```text
-empresa.test
+www.empresa.test
 ```
 
-Também integraremos o DHCP para informar aos clientes:
+Computadores precisam relacioná-los a endereços:
 
 ```text
-DNS:    192.168.50.10
-Domínio: empresa.test
+www.empresa.test
+        ↓
+192.168.50.10
+```
+
+Hoje o foco é entender **como uma consulta DNS funciona** antes de criar nosso próprio servidor autoritativo.
+
+---
+
+# Objetivos
+
+- compreender a função do DNS;
+- diferenciar nome e endereço;
+- utilizar `dig`;
+- identificar tipos de registros;
+- observar servidor consultado e resposta;
+- capturar tráfego DNS.
+
+---
+
+# 1. Conceitos
+
+Alguns registros:
+
+```text
+A      → nome para IPv4
+AAAA   → nome para IPv6
+CNAME  → apelido para outro nome
+MX     → servidor de e-mail
+NS     → servidor responsável pela zona
+PTR    → resolução reversa
 ```
 
 ---
 
-# Bloco 0
-
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y bind9 bind9-utils dnsutils kea-dhcp4-server
-```
-
-Cliente:
-
-```bash
-sudo apt update
-sudo apt install -y dnsutils git gh
-```
-
-Reconstrua seu DHCP da Aula 8.
-
-Prepare seu portfólio.
-
----
-
-# Parte 1 — Declare as zonas
+# 2. Verifique a resolução atual do servidor
 
 No servidor:
 
 ```bash
-sudo nano /etc/bind/named.conf.local
+cat /etc/resolv.conf
 ```
 
-Adicione:
-
-```conf
-zone "empresa.test" {
-    type master;
-    file "/etc/bind/db.empresa.test";
-};
-
-zone "50.168.192.in-addr.arpa" {
-    type master;
-    file "/etc/bind/db.192.168.50";
-};
-```
-
----
-
-# Parte 2 — Zona direta
-
-Crie:
-
-```bash
-sudo nano /etc/bind/db.empresa.test
-```
-
-Use:
-
-```dns
-$TTL 300
-@   IN  SOA ns1.empresa.test. admin.empresa.test. (
-        2026082901
-        3600
-        900
-        604800
-        300
-)
-
-    IN  NS  ns1.empresa.test.
-    IN  MX  10 mail.empresa.test.
-
-ns1     IN  A       192.168.50.10
-srv     IN  A       192.168.50.10
-web     IN  A       192.168.50.10
-mail    IN  A       192.168.50.10
-www     IN  CNAME   web
-```
-
----
-
-# Parte 3 — Entenda os registros
-
-Complete:
-
-| Registro | Função |
-|---|---|
-| SOA | |
-| NS | |
-| A | |
-| CNAME | |
-| MX | |
-
----
-
-# Parte 4 — Zona reversa
-
-Crie:
-
-```bash
-sudo nano /etc/bind/db.192.168.50
-```
-
-Use:
-
-```dns
-$TTL 300
-@   IN  SOA ns1.empresa.test. admin.empresa.test. (
-        2026082901
-        3600
-        900
-        604800
-        300
-)
-
-    IN  NS  ns1.empresa.test.
-
-10  IN  PTR srv.empresa.test.
-50  IN  PTR cliente.empresa.test.
-```
-
-Se seu cliente não utiliza `.50`, ajuste conforme orientação do professor.
-
----
-
-# Parte 5 — Valide
-
-Configuração geral:
-
-```bash
-sudo named-checkconf
-```
-
-Zona direta:
-
-```bash
-sudo named-checkzone empresa.test /etc/bind/db.empresa.test
-```
-
-Zona reversa:
-
-```bash
-sudo named-checkzone 50.168.192.in-addr.arpa /etc/bind/db.192.168.50
-```
-
-Não reinicie BIND se houver erro.
-
----
-
-# Parte 6 — Inicie/reinicie
-
-```bash
-sudo systemctl restart bind9
-```
-
-Verifique:
-
-```bash
-systemctl is-active bind9
-```
-
-Porta:
-
-```bash
-sudo ss -luntp | grep ':53'
-```
-
----
-
-# Parte 7 — Teste diretamente o servidor
-
-No cliente:
-
-```bash
-dig @192.168.50.10 empresa.test NS
-```
-
-```bash
-dig @192.168.50.10 srv.empresa.test A
-```
-
-```bash
-dig @192.168.50.10 www.empresa.test
-```
-
-```bash
-dig @192.168.50.10 empresa.test MX
-```
-
-```bash
-dig @192.168.50.10 -x 192.168.50.10
-```
-
-Registre resultados relevantes.
-
----
-
-# Parte 8 — Integre o DHCP
-
-No `kea-dhcp4.conf`, dentro da subnet, adicione:
-
-```json
-"option-data": [
-  {
-    "name": "domain-name-servers",
-    "data": "192.168.50.10"
-  },
-  {
-    "name": "domain-name",
-    "data": "empresa.test"
-  }
-]
-```
-
-Atenção à sintaxe JSON.
-
-Valide:
-
-```bash
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-```
-
-Depois:
-
-```bash
-sudo systemctl restart kea-dhcp4-server
-```
-
----
-
-# Parte 9 — Renove o cliente
-
-```bash
-sudo networkctl renew <INTERFACE-REDES2>
-```
-
-Verifique:
+Quando disponível:
 
 ```bash
 resolvectl status
 ```
 
-Procure:
+Teste:
+
+```bash
+getent hosts github.com
+```
+
+---
+
+# 3. Instale ferramentas DNS
+
+No servidor:
+
+```bash
+sudo apt update
+sudo apt install -y dnsutils
+```
+
+Confira:
+
+```bash
+dig -v
+```
+
+---
+
+# 4. Faça consultas
+
+```bash
+dig github.com A
+```
+
+Observe as seções:
 
 ```text
-192.168.50.10
+QUESTION
+ANSWER
+AUTHORITY
+ADDITIONAL
+```
+
+Faça uma consulta resumida:
+
+```bash
+dig +short github.com
+```
+
+---
+
+# 5. Consulte tipos diferentes
+
+Exemplos:
+
+```bash
+dig google.com A
+dig google.com AAAA
+dig gmail.com MX
+dig com NS
+```
+
+Registre uma diferença observada entre os resultados.
+
+---
+
+# 6. Consulte um servidor explicitamente
+
+Exemplo:
+
+```bash
+dig @1.1.1.1 example.com A
+```
+
+O símbolo:
+
+```text
+@SERVIDOR
+```
+
+indica qual servidor DNS será consultado.
+
+---
+
+# 7. Resolução reversa
+
+Escolha um IPv4 obtido em uma consulta anterior:
+
+```bash
+dig -x ENDERECO_IP
+```
+
+O resultado utiliza registros:
+
+```text
+PTR
+```
+
+---
+
+# 8. Observe DNS no tráfego
+
+Em um terminal do servidor:
+
+```bash
+sudo tcpdump -i host0 -nn 'port 53'
+```
+
+Em outro:
+
+```bash
+dig @1.1.1.1 example.com A
+```
+
+Observe:
+
+- IP de origem;
+- IP do servidor DNS;
+- porta 53;
+- requisição e resposta.
+
+> Nesta etapa `host0` está apenas sendo observada. Não altere sua configuração.
+
+---
+
+# 9. Compare `dig` e `getent`
+
+```bash
+dig example.com
+```
+
+e:
+
+```bash
+getent hosts example.com
+```
+
+`dig` é uma ferramenta de investigação DNS.
+
+`getent` consulta o mecanismo de resolução utilizado pelo sistema.
+
+Isso será importante quando integrarmos o cliente ao nosso DNS.
+
+---
+
+# 10. Planeje a zona da disciplina
+
+Nas próximas aulas utilizaremos:
+
+```text
 empresa.test
 ```
 
-na interface interna.
-
----
-
-# Parte 10 — Teste sem indicar o servidor
-
-```bash
-dig srv.empresa.test
-```
-
-```bash
-dig www.empresa.test
-```
-
-```bash
-dig empresa.test MX
-```
-
-Também:
-
-```bash
-getent hosts srv.empresa.test
-```
-
----
-
-# Parte 11 — Diagnóstico orientado
-
-O professor introduzirá uma falha simples.
-
-Use, conforme o caso:
-
-```bash
-sudo named-checkconf
-sudo named-checkzone empresa.test /etc/bind/db.empresa.test
-systemctl status bind9
-sudo journalctl -u bind9 -n 30
-dig @192.168.50.10 srv.empresa.test
-```
-
-Registre:
+Nomes previstos:
 
 ```text
-Sintoma:
-____________________________________________________________
+ns.empresa.test
+srv.empresa.test
+www.empresa.test
+mail.empresa.test
+```
 
-Evidência:
-____________________________________________________________
+Endereço principal do servidor:
 
-Causa:
-____________________________________________________________
+```text
+192.168.50.10
+```
 
-Correção:
-____________________________________________________________
+Pense:
 
-Validação:
-____________________________________________________________
+```text
+Qual registro aponta ns.empresa.test para um IPv4?
+____________________________________
+
+Qual registro pode tornar www um apelido de srv?
+____________________________________
+
+Qual registro indica o servidor de e-mail?
+____________________________________
 ```
 
 ---
 
-# Parte 12 — Portfólio
+# 11. Preparação do portfólio
 
 Crie:
 
-```text
-dns/aula-10/
-├── README.md
-├── named.conf.local
-├── db.empresa.test
-├── db.192.168.50
-└── kea-dhcp4.conf
-```
-
-No README registre:
-
-- registros criados;
-- consultas diretas;
-- reverse lookup;
-- DNS recebido por DHCP;
-- consulta integrada sem `@`;
-- diagnóstico.
-
-Versione:
-
 ```bash
-git add dns/aula-10
-git commit -m "Aula 10 - integra DHCP e DNS"
-git push
-gh auth logout
+cd ~/SEU_REPOSITORIO
+mkdir -p dns
 ```
 
----
+Não faça o commit ainda.
 
-# Próxima aula
+As Aulas 10, 11 e 12 formam o marco:
 
-**Avaliação Prática 1 — DHCP + DNS.**
+```text
+DNS + integração DHCP/DNS
+```

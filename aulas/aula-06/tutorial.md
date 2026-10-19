@@ -1,172 +1,252 @@
-# Aula 06 — Observando DHCP: Discover, Offer, Request e ACK
+# Aula 06 — Rede individual cliente-servidor
+
+**Data:** 20/10/2026  
+**Duração:** 100 minutos
+
+---
 
 ## Situação-problema
 
-Até agora configuramos manualmente:
+Até agora você acessou principalmente seu servidor por `host0`.
+
+Hoje começa a rede experimental da disciplina:
 
 ```text
-192.168.50.20/24
+Windows
+   │
+   │ SSH
+   ▼
+srv-r2-sNN
+   ├── host0 → gerenciamento
+   └── lab0: 192.168.50.10/24
+               │
+               │
+               ▼
+          cli-r2-sNN
+          lab0: 192.168.50.20/24
 ```
 
-no cliente.
-
-Nesta aula o cliente passará a receber automaticamente um endereço na rede `REDES2`.
-
-Antes de aprender a configurar o servidor, vamos observar o protocolo funcionando.
-
-```text
-Discover
-  ↓
-Offer
-  ↓
-Request
-  ↓
-ACK
-```
-
-Essa sequência é conhecida como **DORA**.
+Ao final da aula, servidor e cliente deverão se comunicar pela `lab0`, sem alterar a interface de gerenciamento.
 
 ---
 
 # Objetivos
 
-Você deverá:
+Ao final, você deverá conseguir:
 
-- compreender a finalidade do DHCP;
-- identificar UDP 67 e 68;
-- capturar o DORA;
-- identificar o endereço concedido;
-- verificar que a Internet continua pela NAT;
-- salvar a captura;
-- documentar evidências.
-
----
-
-# Bloco 0 — Ambiente
-
-## Servidor
-
-Hostname:
-
-```bash
-sudo hostnamectl set-hostname srv-redes2
-```
-
-A rede interna deve ser:
-
-```text
-192.168.50.10/24
-```
-
-Instale:
-
-```bash
-sudo apt update
-sudo apt install -y kea-dhcp4-server tcpdump iproute2
-```
-
-## Cliente
-
-```bash
-sudo hostnamectl set-hostname cli-redes2
-sudo apt update
-sudo apt install -y tcpdump iproute2 iputils-ping git gh
-```
-
-Prepare seu portfólio:
-
-```bash
-gh auth login --web --git-protocol https
-gh auth setup-git
-cd ~
-git clone <URL-DO-SEU-REPOSITORIO>
-cd <NOME-DA-PASTA>
-```
+- distinguir `host0` e `lab0`;
+- configurar IPv4 estático somente na rede de laboratório;
+- validar uma configuração Netplan;
+- testar comunicação entre servidor e cliente;
+- interpretar `ip addr`, `ip route` e `ip neigh`;
+- acessar o cliente a partir do servidor;
+- preservar o acesso administrativo do servidor.
 
 ---
 
-# Parte 1 — Antes do DHCP
+# 1. Entre no servidor
 
-No cliente:
+No Windows:
+
+```powershell
+ssh -p SUA_PORTA SEU_USUARIO@172.16.2.34
+```
+
+No servidor:
 
 ```bash
+whoami
+hostname
 ip -br addr
 ip route
 ```
 
-Identifique a interface `REDES2`.
-
-MAC da interface:
-
-```bash
-ip link show <INTERFACE-REDES2>
-```
-
-Registre:
+Confirme:
 
 ```text
-Interface: ___________________________
-MAC:       ___________________________
+[ ] host0 existe
+[ ] lab0 existe
+[ ] a rota default não utiliza lab0
 ```
 
 ---
 
-# Parte 2 — O servidor de observação
+# 2. Regra da aula
 
-Nesta aula o professor fornecerá uma configuração pronta do Kea.
+A configuração experimental será feita **somente em `lab0`**.
 
-Ela existe apenas para observarmos o protocolo antes de construirmos nossa própria configuração.
-
-No servidor, faça backup:
-
-```bash
-sudo cp /etc/kea/kea-dhcp4.conf /etc/kea/kea-dhcp4.conf.bak
-```
-
-Use o arquivo fornecido pelo professor e substitua:
+Não modifique:
 
 ```text
-<INTERFACE-REDES2>
+host0
 ```
 
-pelo nome real da interface interna.
+Não crie em `lab0`:
 
-Valide:
-
-```bash
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-```
-
-Depois:
-
-```bash
-sudo systemctl restart kea-dhcp4-server
-systemctl is-active kea-dhcp4-server
+```text
+gateway4
+default route
+rota default
 ```
 
 ---
 
-# Parte 3 — Configure o cliente para pedir endereço
+# 3. Faça backup da configuração atual
 
-No cliente:
+Veja os arquivos existentes:
 
 ```bash
-sudo nano /etc/netplan/60-redes2.yaml
+ls -l /etc/netplan/
 ```
 
-Use:
+Crie uma pasta de backup:
+
+```bash
+sudo mkdir -p /root/backup-netplan-aula06
+```
+
+Copie:
+
+```bash
+sudo cp -a /etc/netplan/. /root/backup-netplan-aula06/
+```
+
+---
+
+# 4. Configure `lab0` no servidor
+
+Crie:
+
+```bash
+sudo nano /etc/netplan/90-redes2-lab.yaml
+```
+
+Conteúdo:
 
 ```yaml
 network:
   version: 2
   ethernets:
-    <INTERFACE-REDES2>:
-      dhcp4: true
-      dhcp4-overrides:
-        use-routes: false
+    lab0:
+      dhcp4: false
+      addresses:
+        - 192.168.50.10/24
 ```
 
-Substitua a interface.
+Valide a sintaxe:
+
+```bash
+sudo netplan generate
+```
+
+Se não houver erro:
+
+```bash
+sudo netplan apply
+```
+
+Verifique:
+
+```bash
+ip -br addr show lab0
+```
+
+Resultado esperado:
+
+```text
+lab0    UP    192.168.50.10/24
+```
+
+---
+
+# 5. Observe as rotas novamente
+
+```bash
+ip route
+```
+
+Você deverá encontrar uma rota para:
+
+```text
+192.168.50.0/24
+```
+
+pela `lab0`.
+
+A rota `default` deve continuar associada à interface de gerenciamento.
+
+Responda:
+
+```text
+Rede conectada pela lab0:
+____________________________________
+
+Interface da rota default:
+____________________________________
+```
+
+---
+
+# 6. Acesso inicial ao cliente
+
+O professor ativará seu cliente e disponibilizará o acesso inicial.
+
+Do **servidor**, teste:
+
+```bash
+ping -c 3 192.168.50.20
+```
+
+Se houver resposta:
+
+```bash
+ssh SEU_USUARIO@192.168.50.20
+```
+
+Use a credencial indicada pelo professor para o cliente.
+
+Depois confirme:
+
+```bash
+whoami
+hostname
+ip -br addr
+```
+
+O hostname deverá seguir o padrão:
+
+```text
+cli-r2-sNN
+```
+
+---
+
+# 7. Configure `lab0` no cliente
+
+No cliente:
+
+```bash
+sudo mkdir -p /root/backup-netplan-aula06
+sudo cp -a /etc/netplan/. /root/backup-netplan-aula06/
+```
+
+Crie:
+
+```bash
+sudo nano /etc/netplan/90-redes2-lab.yaml
+```
+
+Conteúdo:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    lab0:
+      dhcp4: false
+      addresses:
+        - 192.168.50.20/24
+```
 
 Valide:
 
@@ -174,221 +254,185 @@ Valide:
 sudo netplan generate
 ```
 
-**Ainda não aplique.**
-
----
-
-# Parte 4 — Inicie a captura
-
-No servidor:
+Aplique:
 
 ```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -vvv 'udp port 67 or udp port 68'
+sudo netplan apply
 ```
 
-Agora, no cliente:
+Confira:
 
 ```bash
-sudo netplan try
-```
-
-Confirme.
-
-Observe a captura no servidor.
-
----
-
-# Parte 5 — Identifique o DORA
-
-Procure mensagens correspondentes a:
-
-```text
-Discover
-Offer
-Request
-ACK
-```
-
-Preencha:
-
-| Etapa | Quem enviou? | O que aconteceu? |
-|---|---|---|
-| Discover | | |
-| Offer | | |
-| Request | | |
-| ACK | | |
-
----
-
-# Parte 6 — Verifique o endereço
-
-No cliente:
-
-```bash
-ip -br addr
-```
-
-IPv4 recebido:
-
-```text
-____________________________________
-```
-
-Ele deve pertencer ao pool:
-
-```text
-192.168.50.100–192.168.50.150
-```
-
----
-
-# Parte 7 — Verifique as rotas
-
-```bash
+ip -br addr show lab0
 ip route
 ```
 
-Responda:
-
-### Existe uma rota para `192.168.50.0/24`?
-
-```text
-☐ Sim
-☐ Não
-```
-
-### A rota padrão mudou para REDES2?
-
-```text
-☐ Sim
-☐ Não
-```
-
-### Por que ela não deve mudar?
-
-____________________________________________________________________
+> O cliente não precisa de gateway na `lab0` para conversar com o servidor na mesma rede.
 
 ---
 
-# Parte 8 — Testes
+# 8. Teste nos dois sentidos
+
+No cliente:
 
 ```bash
 ping -c 3 192.168.50.10
 ```
 
-e:
-
-```bash
-ping -c 3 1.1.1.1
-```
-
-Ambos devem funcionar.
-
----
-
-# Parte 9 — Salve a captura
-
 No servidor:
 
 ```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -c 12 \
-  -w aula-06-dhcp-dora.pcap \
-  'udp port 67 or udp port 68'
+ping -c 3 192.168.50.20
 ```
 
-Provoque nova negociação conforme orientação do professor.
-
-Depois:
+Agora observe a tabela de vizinhos:
 
 ```bash
-tcpdump -nn -vvv -r aula-06-dhcp-dora.pcap
+ip neigh
+```
+
+Localize o endereço da outra máquina.
+
+---
+
+# 9. O que `ip neigh` mostrou?
+
+Ethernet não utiliza somente endereços IPv4.
+
+Depois da comunicação, o sistema pode armazenar uma associação entre:
+
+```text
+IPv4
+  ↕
+endereço MAC
+```
+
+Registre uma linha observada:
+
+```text
+____________________________________________________________
 ```
 
 ---
 
-# Parte 10 — Lease
+# 10. Teste SSH pela rede de laboratório
 
-Consulte:
-
-```bash
-networkctl status <INTERFACE-REDES2>
-```
-
-Procure informações relativas ao endereço DHCP.
-
-Quando orientado:
+A partir do servidor:
 
 ```bash
-sudo networkctl renew <INTERFACE-REDES2>
+ssh SEU_USUARIO@192.168.50.20
 ```
 
-Uma renovação pode não apresentar exatamente o mesmo DORA completo.
+Pergunta:
+
+### Esta conexão utiliza a porta externa `22NN` do host?
+
+```text
+☐ Sim
+☐ Não
+```
+
+Explique:
+
+```text
+____________________________________________________________
+```
 
 ---
 
-# Parte 11 — Registre no portfólio
+# 11. Prepare a evidência da atividade
+
+No servidor, entre no seu portfólio:
+
+```bash
+cd ~/SEU_REPOSITORIO
+```
 
 Crie:
 
 ```bash
-mkdir -p dhcp/aula-06
+mkdir -p rede/aula-06
 ```
 
-Copie a captura do servidor para essa pasta com `scp`, se necessário.
+Salve a configuração do servidor:
+
+```bash
+sudo cat /etc/netplan/90-redes2-lab.yaml \
+  > rede/aula-06/netplan-servidor.yaml
+```
+
+A partir do cliente, copie ou registre a configuração utilizada nele.
 
 Crie:
 
 ```bash
-nano dhcp/aula-06/README.md
+nano rede/aula-06/README.md
 ```
 
-Use:
+Inclua:
 
 ```markdown
-# Aula 06 — DHCP DORA
+# Aula 06 — Rede individual
 
-## Cliente
-- interface:
-- MAC:
-- IPv4 recebido:
+## Topologia
 
-## Sequência observada
-- Discover:
-- Offer:
-- Request:
-- ACK:
+Servidor:
+Cliente:
+Rede:
 
-## Parâmetros
-- servidor DHCP:
-- endereço oferecido:
-- lease observado:
+## Interfaces
 
-## Rota
-Explique por que a rota padrão continuou pela interface NAT.
+### Servidor
+- host0:
+- lab0:
 
-## Síntese
-Por que o cliente utiliza broadcast no início do processo?
+### Cliente
+- lab0:
+
+## Testes
+- servidor → cliente:
+- cliente → servidor:
+
+## Rotas
+- rota da rede de laboratório:
+- rota default do servidor:
+
+## Conclusão
+Explique por que host0 e lab0 possuem funções diferentes.
 ```
 
 ---
 
-# Parte 12 — Versione
+# 12. Não faça o commit ainda
 
-```bash
-git add dhcp/aula-06
-git diff --cached --stat
-git commit -m "Aula 06 - registra processo DHCP DORA"
-git push
+A Aula 06 e a Aula 07 formam um único marco:
+
+```text
+rede + troubleshooting
 ```
 
-Depois:
+Por enquanto:
 
 ```bash
-gh auth logout
+git status
 ```
+
+Confira se os arquivos estão no local correto.
+
+O commit será concluído após a atividade de diagnóstico da Aula 07.
 
 ---
 
-# Próxima aula
+# Checklist
 
-Na próxima aula você deixará de usar uma configuração pronta e construirá o servidor DHCP com **Kea**.
+```text
+[ ] host0 foi preservada.
+[ ] servidor possui 192.168.50.10/24 em lab0.
+[ ] cliente possui 192.168.50.20/24 em lab0.
+[ ] não existe gateway padrão pela lab0.
+[ ] servidor pinga cliente.
+[ ] cliente pinga servidor.
+[ ] observei ip neigh.
+[ ] acessei o cliente via SSH pela rede interna.
+[ ] documentei a topologia no portfólio.
+```

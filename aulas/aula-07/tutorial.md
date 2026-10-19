@@ -1,316 +1,347 @@
-# Aula 07 — Configurando DHCP com Kea
+# Aula 07 — Troubleshooting e captura de tráfego
 
-## Objetivo da aula
+**Data:** 22/10/2026  
+**Duração:** 150 minutos
 
-Na aula anterior você observou o DORA usando uma configuração pronta.
+---
 
-Agora você construirá o servidor DHCP.
+## Objetivo
 
-Rede:
+Hoje o foco não é instalar um novo serviço.
+
+O objetivo é aprender a responder:
+
+> **onde está a falha e qual evidência comprova isso?**
+
+Utilizaremos a rede construída na Aula 06:
 
 ```text
-192.168.50.0/24
-```
-
-Servidor:
-
-```text
+srv-r2-sNN
 192.168.50.10/24
-```
-
-Pool:
-
-```text
-192.168.50.100–192.168.50.150
+      │
+      │ lab0
+      │
+192.168.50.20/24
+cli-r2-sNN
 ```
 
 ---
 
-# Bloco 0
+# Método de diagnóstico
 
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y kea-dhcp4-server tcpdump
-```
-
-Cliente:
-
-```bash
-sudo apt update
-sudo apt install -y iproute2 iputils-ping git gh
-```
-
-Garanta que:
+Utilizaremos:
 
 ```text
-srv-redes2 → 192.168.50.10/24
-cli-redes2 → DHCP na interface REDES2
+Sintoma
+   ↓
+Hipótese
+   ↓
+Teste
+   ↓
+Evidência
+   ↓
+Causa
+   ↓
+Correção
+   ↓
+Validação
 ```
 
-Prepare seu portfólio.
+Evite alterar várias configurações ao mesmo tempo.
 
 ---
 
-# Parte 1 — Backup
+# 1. Verifique o estado conhecido
 
 No servidor:
 
 ```bash
-sudo cp /etc/kea/kea-dhcp4.conf /etc/kea/kea-dhcp4.conf.original
+hostname
+ip -br addr
+ip route
+ip neigh
 ```
 
-Identifique a interface interna:
+Teste:
 
 ```bash
+ping -c 3 192.168.50.20
+```
+
+No cliente:
+
+```bash
+hostname
 ip -br addr
 ip route
 ```
 
-Registre:
-
-```text
-Interface REDES2: ______________________
-```
-
----
-
-# Parte 2 — Crie a configuração
-
-```bash
-sudo nano /etc/kea/kea-dhcp4.conf
-```
-
-Use:
-
-```json
-{
-  "Dhcp4": {
-    "interfaces-config": {
-      "interfaces": [ "<INTERFACE-REDES2>" ]
-    },
-
-    "lease-database": {
-      "type": "memfile",
-      "persist": true,
-      "name": "/var/lib/kea/kea-leases4.csv"
-    },
-
-    "valid-lifetime": 600,
-    "renew-timer": 200,
-    "rebind-timer": 400,
-
-    "subnet4": [
-      {
-        "subnet": "192.168.50.0/24",
-        "pools": [
-          { "pool": "192.168.50.100 - 192.168.50.150" }
-        ]
-      }
-    ]
-  }
-}
-```
-
-Substitua a interface.
-
----
-
-# Parte 3 — Entenda o arquivo
-
-Complete:
-
-| Bloco | Função |
-|---|---|
-| `interfaces-config` | |
-| `subnet4` | |
-| `pools` | |
-| `valid-lifetime` | |
-| `lease-database` | |
-
-Pergunta:
-
-### Por que não configuramos `routers`?
-
-____________________________________________________________________
-
----
-
-# Parte 4 — Valide
-
-```bash
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-```
-
-Se houver erro:
-
-> Não reinicie o serviço.
-
-Corrija primeiro.
-
----
-
-# Parte 5 — Inicie o serviço
-
-```bash
-sudo systemctl restart kea-dhcp4-server
-```
-
-Verifique:
-
-```bash
-systemctl status kea-dhcp4-server --no-pager
-```
-
-Porta:
-
-```bash
-sudo ss -lunp | grep ':67'
-```
-
----
-
-# Parte 6 — Cliente
-
-Confirme que a interface interna usa DHCP:
-
-```yaml
-dhcp4: true
-dhcp4-overrides:
-  use-routes: false
-```
-
-Valide/aplique.
-
-Depois:
-
-```bash
-ip -br addr
-ip route
-```
-
-IPv4 recebido:
-
-```text
-____________________________________
-```
-
----
-
-# Parte 7 — Teste
+Teste:
 
 ```bash
 ping -c 3 192.168.50.10
 ```
 
-e:
-
-```bash
-ping -c 3 1.1.1.1
-```
+Antes de procurar uma falha, conheça o estado saudável.
 
 ---
 
-# Parte 8 — Veja o lease no servidor
+# 2. Observe ICMP com `tcpdump`
+
+No servidor:
 
 ```bash
-sudo cat /var/lib/kea/kea-leases4.csv
+sudo tcpdump -i lab0 -nn icmp
 ```
 
-Localize o endereço do cliente.
+Mantenha a captura aberta.
 
----
-
-# Parte 9 — Logs
+No cliente:
 
 ```bash
-sudo journalctl -u kea-dhcp4-server -n 30
+ping -c 4 192.168.50.10
 ```
 
-Procure evidências relacionadas ao cliente.
-
----
-
-# Parte 10 — Incidente de validação
-
-O professor orientará uma alteração temporária inválida no pool.
-
-Antes de reiniciar:
-
-```bash
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-```
-
-Registre:
+Na captura, identifique:
 
 ```text
-Erro encontrado:
-____________________________________________________________
+echo request
+echo reply
+```
 
-Por que a validação antes do restart foi útil?
+Pergunta:
+
+### O `ping` é apenas uma mensagem?
+
+```text
+☐ Sim
+☐ Não
+```
+
+Registre o que aparece na captura:
+
+```text
 ____________________________________________________________
 ```
 
-Restaure a configuração correta e valide novamente.
+Interrompa com:
+
+```text
+Ctrl+C
+```
 
 ---
 
-# Parte 11 — Portfólio
+# 3. Observe ARP
 
-Crie:
+No servidor:
 
-```text
-dhcp/aula-07/
+```bash
+sudo tcpdump -i lab0 -nn arp
 ```
 
-Copie a configuração final para:
+Em outro terminal, limpe apenas a entrada do cliente:
 
-```text
-dhcp/aula-07/kea-dhcp4.conf
+```bash
+sudo ip neigh del 192.168.50.20 dev lab0 2>/dev/null || true
 ```
 
-Crie `README.md` com:
+Depois:
+
+```bash
+ping -c 1 192.168.50.20
+```
+
+Observe a resolução:
+
+```text
+Who has ...?
+... is at ...
+```
+
+Depois:
+
+```bash
+ip neigh show dev lab0
+```
+
+---
+
+# 4. Serviço, porta e processo
+
+No servidor:
+
+```bash
+systemctl status ssh
+```
+
+Depois:
+
+```bash
+sudo ss -lntp | grep ':22'
+```
+
+Esses comandos respondem perguntas diferentes:
+
+```text
+systemctl
+→ estado do serviço
+
+ss
+→ porta/socket em escuta
+```
+
+Complete:
+
+```text
+O serviço SSH está:
+____________________________________
+
+A porta observada é:
+____________________________________
+```
+
+---
+
+# 5. Logs
+
+Últimos eventos do SSH:
+
+```bash
+sudo journalctl -u ssh -n 20 --no-pager
+```
+
+Em outro terminal, faça uma conexão para o servidor e depois consulte novamente.
+
+Pergunta:
+
+### O log é uma evidência do que ocorreu no serviço?
+
+```text
+☐ Sim
+☐ Não
+```
+
+---
+
+# 6. Incidente de laboratório
+
+O professor aplicará ou indicará um incidente no seu ambiente.
+
+Você receberá apenas o **sintoma** ou o **estado esperado**.
+
+Não comece alterando arquivos.
+
+Primeiro colete:
+
+```bash
+ip -br addr
+ip route
+ip neigh
+ping -c 3 DESTINO
+ss -lntup
+systemctl --failed
+```
+
+Quando houver um serviço envolvido:
+
+```bash
+systemctl status SERVICO
+journalctl -u SERVICO -n 30 --no-pager
+```
+
+Quando houver dúvida sobre tráfego:
+
+```bash
+sudo tcpdump -i lab0 -nn
+```
+
+---
+
+# 7. Registre o diagnóstico
+
+No portfólio:
+
+```bash
+mkdir -p rede/aula-07
+nano rede/aula-07/diagnostico.md
+```
+
+Utilize:
 
 ```markdown
-# Aula 07 — Servidor DHCP Kea
+# Aula 07 — Troubleshooting
 
-## Servidor
-- interface:
-- IPv4:
+## Sintoma
+O que estava acontecendo?
 
-## DHCP
-- subnet:
-- pool:
-- lease:
-- gateway interno: não configurado
+## Hipótese
+Qual foi a primeira hipótese?
 
-## Cliente
-- IPv4 recebido:
+## Teste
+Qual comando ou procedimento foi utilizado?
 
-## Evidências
-- validação:
-- serviço:
-- porta UDP/67:
-- lease:
+## Evidência
+Qual saída sustentou ou rejeitou a hipótese?
 
-## Incidente
-- erro:
-- evidência:
-- correção:
-```
+## Causa
+Qual era a causa real?
 
-Versione:
+## Correção
+O que foi alterado?
 
-```bash
-git add dhcp/aula-07
-git commit -m "Aula 07 - configura servidor DHCP Kea"
-git push
-gh auth logout
+## Validação
+Como foi comprovado que o problema foi resolvido?
 ```
 
 ---
 
-# Próxima aula
+# 8. Marco de competência: rede + troubleshooting
 
-Reservas, leases e troubleshooting de DHCP.
+Confira:
+
+```bash
+git status
+```
+
+Inclua:
+
+```text
+rede/aula-06/
+rede/aula-07/
+```
+
+Depois:
+
+```bash
+git add rede/
+git status
+```
+
+Commit sugerido:
+
+```bash
+git commit -m "Configura rede de laboratorio e documenta troubleshooting"
+```
+
+Envie:
+
+```bash
+git push
+```
+
+---
+
+# Checklist
+
+```text
+[ ] validei o estado saudável antes do incidente.
+[ ] capturei ICMP.
+[ ] observei ARP.
+[ ] diferenciei serviço e porta.
+[ ] consultei logs.
+[ ] diagnostiquei sem alterar tudo ao mesmo tempo.
+[ ] registrei sintoma, hipótese, teste e evidência.
+[ ] corrigi e validei.
+[ ] concluí o marco rede + troubleshooting no portfólio.
+```
