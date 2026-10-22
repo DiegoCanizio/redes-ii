@@ -1,57 +1,25 @@
-# Aula 07 — Troubleshooting e captura de tráfego
+# Aula 07 — Troubleshooting e DHCP inicial
 
 **Data:** 22/10/2026  
 **Duração:** 150 minutos
 
----
-
 ## Objetivo
 
-Hoje o foco não é instalar um novo serviço.
+Partir da rede funcional da Aula 06, aprender a diagnosticar seus componentes e substituir o endereço manual do cliente por uma concessão DHCP.
 
-O objetivo é aprender a responder:
-
-> **onde está a falha e qual evidência comprova isso?**
-
-Utilizaremos a rede construída na Aula 06:
+Ao final:
 
 ```text
 srv-r2-sNN
-192.168.50.10/24
-      │
-      │ lab0
-      │
-192.168.50.20/24
+lab0 = 192.168.50.10/24
+Kea DHCPv4
+        │
+        ▼
 cli-r2-sNN
+lab0 = DHCP
 ```
 
----
-
-# Método de diagnóstico
-
-Utilizaremos:
-
-```text
-Sintoma
-   ↓
-Hipótese
-   ↓
-Teste
-   ↓
-Evidência
-   ↓
-Causa
-   ↓
-Correção
-   ↓
-Validação
-```
-
-Evite alterar várias configurações ao mesmo tempo.
-
----
-
-# 1. Verifique o estado conhecido
+## Parte 1 — Conheça o estado saudável
 
 No servidor:
 
@@ -60,11 +28,6 @@ hostname
 ip -br addr
 ip route
 ip neigh
-```
-
-Teste:
-
-```bash
 ping -c 3 192.168.50.20
 ```
 
@@ -74,274 +37,217 @@ No cliente:
 hostname
 ip -br addr
 ip route
-```
-
-Teste:
-
-```bash
 ping -c 3 192.168.50.10
 ```
 
-Antes de procurar uma falha, conheça o estado saudável.
+## Parte 2 — Método de troubleshooting
 
----
+```text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+```
 
-# 2. Observe ICMP com `tcpdump`
+## Parte 3 — ARP e ICMP
 
 No servidor:
 
 ```bash
-sudo tcpdump -i lab0 -nn icmp
+sudo tcpdump -i lab0 -nn 'arp or icmp'
 ```
-
-Mantenha a captura aberta.
 
 No cliente:
 
 ```bash
-ping -c 4 192.168.50.10
+sudo ip neigh flush dev lab0
+ping -c 3 192.168.50.10
 ```
 
-Na captura, identifique:
+Identifique ARP antes do primeiro ICMP.
 
-```text
-echo request
-echo reply
-```
-
-Pergunta:
-
-### O `ping` é apenas uma mensagem?
-
-```text
-☐ Sim
-☐ Não
-```
-
-Registre o que aparece na captura:
-
-```text
-____________________________________________________________
-```
-
-Interrompa com:
-
-```text
-Ctrl+C
-```
-
----
-
-# 3. Observe ARP
+## Parte 4 — Serviço, porta e log
 
 No servidor:
 
 ```bash
-sudo tcpdump -i lab0 -nn arp
-```
-
-Em outro terminal, limpe apenas a entrada do cliente:
-
-```bash
-sudo ip neigh del 192.168.50.20 dev lab0 2>/dev/null || true
-```
-
-Depois:
-
-```bash
-ping -c 1 192.168.50.20
-```
-
-Observe a resolução:
-
-```text
-Who has ...?
-... is at ...
-```
-
-Depois:
-
-```bash
-ip neigh show dev lab0
-```
-
----
-
-# 4. Serviço, porta e processo
-
-No servidor:
-
-```bash
-systemctl status ssh
-```
-
-Depois:
-
-```bash
+systemctl status ssh --no-pager
 sudo ss -lntp | grep ':22'
-```
-
-Esses comandos respondem perguntas diferentes:
-
-```text
-systemctl
-→ estado do serviço
-
-ss
-→ porta/socket em escuta
-```
-
-Complete:
-
-```text
-O serviço SSH está:
-____________________________________
-
-A porta observada é:
-____________________________________
-```
-
----
-
-# 5. Logs
-
-Últimos eventos do SSH:
-
-```bash
 sudo journalctl -u ssh -n 20 --no-pager
 ```
 
-Em outro terminal, faça uma conexão para o servidor e depois consulte novamente.
-
-Pergunta:
-
-### O log é uma evidência do que ocorreu no serviço?
+Relacione:
 
 ```text
-☐ Sim
-☐ Não
+systemctl  → serviço
+ss         → socket/porta
+journalctl → eventos
 ```
 
----
+## Parte 5 — Por que DHCP?
 
-# 6. Incidente de laboratório
+Até agora o cliente possui endereço configurado manualmente. Em uma rede com muitos clientes, queremos automatizar a entrega de parâmetros.
 
-O professor aplicará ou indicará um incidente no seu ambiente.
-
-Você receberá apenas o **sintoma** ou o **estado esperado**.
-
-Não comece alterando arquivos.
-
-Primeiro colete:
-
-```bash
-ip -br addr
-ip route
-ip neigh
-ping -c 3 DESTINO
-ss -lntup
-systemctl --failed
-```
-
-Quando houver um serviço envolvido:
-
-```bash
-systemctl status SERVICO
-journalctl -u SERVICO -n 30 --no-pager
-```
-
-Quando houver dúvida sobre tráfego:
-
-```bash
-sudo tcpdump -i lab0 -nn
-```
-
----
-
-# 7. Registre o diagnóstico
-
-No portfólio:
-
-```bash
-mkdir -p rede/aula-07
-nano rede/aula-07/diagnostico.md
-```
-
-Utilize:
-
-```markdown
-# Aula 07 — Troubleshooting
-
-## Sintoma
-O que estava acontecendo?
-
-## Hipótese
-Qual foi a primeira hipótese?
-
-## Teste
-Qual comando ou procedimento foi utilizado?
-
-## Evidência
-Qual saída sustentou ou rejeitou a hipótese?
-
-## Causa
-Qual era a causa real?
-
-## Correção
-O que foi alterado?
-
-## Validação
-Como foi comprovado que o problema foi resolvido?
-```
-
----
-
-# 8. Marco de competência: rede + troubleshooting
-
-Confira:
-
-```bash
-git status
-```
-
-Inclua:
+Processo inicial:
 
 ```text
-rede/aula-06/
-rede/aula-07/
+cliente                       servidor
+   │──── DHCPDISCOVER ──────────>│
+   │<──── DHCPOFFER ─────────────│
+   │──── DHCPREQUEST ────────────>│
+   │<──── DHCPACK ────────────────│
 ```
 
-Depois:
-
-```bash
-git add rede/
-git status
-```
-
-Commit sugerido:
-
-```bash
-git commit -m "Configura rede de laboratorio e documenta troubleshooting"
-```
-
-Envie:
-
-```bash
-git push
-```
-
----
-
-# Checklist
+Portas:
 
 ```text
-[ ] validei o estado saudável antes do incidente.
-[ ] capturei ICMP.
-[ ] observei ARP.
-[ ] diferenciei serviço e porta.
-[ ] consultei logs.
-[ ] diagnostiquei sem alterar tudo ao mesmo tempo.
-[ ] registrei sintoma, hipótese, teste e evidência.
-[ ] corrigi e validei.
-[ ] concluí o marco rede + troubleshooting no portfólio.
+servidor → UDP/67
+cliente  → UDP/68
 ```
+
+## Parte 6 — Instale o Kea no servidor
+
+```bash
+sudo apt update
+sudo apt install -y kea-dhcp4-server
+```
+
+Faça backup:
+
+```bash
+sudo cp /etc/kea/kea-dhcp4.conf /etc/kea/kea-dhcp4.conf.bak-aula07
+```
+
+Edite:
+
+```bash
+sudo nano /etc/kea/kea-dhcp4.conf
+```
+
+Use como configuração inicial:
+
+```json
+{
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": [ "lab0" ]
+    },
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "/var/lib/kea/kea-leases4.csv"
+    },
+    "valid-lifetime": 600,
+    "renew-timer": 300,
+    "rebind-timer": 500,
+    "subnet4": [
+      {
+        "subnet": "192.168.50.0/24",
+        "pools": [
+          { "pool": "192.168.50.100 - 192.168.50.150" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Parte 7 — Valide antes de reiniciar
+
+```bash
+python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+```
+
+Somente depois:
+
+```bash
+sudo systemctl restart kea-dhcp4-server
+systemctl is-active kea-dhcp4-server
+sudo ss -lunp | grep ':67'
+```
+
+## Parte 8 — Capture o DHCP
+
+No servidor:
+
+```bash
+sudo tcpdump -i lab0 -nn -vvv 'udp port 67 or udp port 68'
+```
+
+## Parte 9 — Mude o cliente para DHCP
+
+No cliente:
+
+```bash
+sudo cp /etc/systemd/network/80-lab0.network \
+  /etc/systemd/network/80-lab0.network.bak-aula07
+sudo nano /etc/systemd/network/80-lab0.network
+```
+
+Conteúdo:
+
+```ini
+[Match]
+Name=lab0
+
+[Network]
+DHCP=ipv4
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+```
+
+Reaplique:
+
+```bash
+sudo networkctl reload
+sudo networkctl reconfigure lab0
+```
+
+Se necessário:
+
+```bash
+sudo systemctl restart systemd-networkd
+```
+
+A conexão SSH pela antiga `.20` pode cair. Isso é esperado.
+
+## Parte 10 — Descubra a concessão
+
+No servidor:
+
+```bash
+sudo tail -n 10 /var/lib/kea/kea-leases4.csv
+sudo journalctl -u kea-dhcp4-server -n 30 --no-pager
+```
+
+O endereço deve pertencer a:
+
+```text
+192.168.50.100–192.168.50.150
+```
+
+Reconecte:
+
+```bash
+ssh SEU_USUARIO@IP_RECEBIDO
+```
+
+## Registro
+
+Crie `dhcp/aula-07/README.md` e registre:
+
+- estado inicial da rede;
+- método de troubleshooting;
+- pool configurado;
+- endereço concedido;
+- mensagens DHCP observadas;
+- evidência de UDP/67;
+- diferença entre endereço estático e DHCP.
+
+## Fechamento
+
+Não adicione ainda DNS, domínio ou reserva. Esses itens pertencem às aulas seguintes.

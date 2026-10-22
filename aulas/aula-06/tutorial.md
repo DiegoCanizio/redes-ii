@@ -1,283 +1,210 @@
-# Aula 06 — Rede individual cliente-servidor
+# Aula 06 — Rede individual cliente-servidor com systemd-networkd
 
-**Data:** 20/10/2026  
 **Duração:** 100 minutos
 
----
+## Contexto
 
-## Situação-problema
+Nesta aula ocorreu um problema real de infraestrutura. O diretório `/etc/netplan/` estava vazio nos containers e, mesmo após a criação de arquivos YAML, o Netplan apresentou erros, incluindo permissões e `Failed to send request`, embora `systemd-networkd` estivesse ativo.
 
-Até agora você acessou principalmente seu servidor por `host0`.
-
-Hoje começa a rede experimental da disciplina:
+Isso permitiu observar uma relação importante:
 
 ```text
-Windows
-   │
-   │ SSH
-   ▼
-srv-r2-sNN
-   ├── host0 → gerenciamento
-   └── lab0: 192.168.50.10/24
-               │
-               │
-               ▼
-          cli-r2-sNN
-          lab0: 192.168.50.20/24
+Netplan
+   ↓ gera configuração
+systemd-networkd
+   ↓ configura
+interfaces
 ```
 
-Ao final da aula, servidor e cliente deverão se comunicar pela `lab0`, sem alterar a interface de gerenciamento.
+No ambiente `systemd-nspawn` da disciplina, passaremos a configurar a interface experimental diretamente com `systemd-networkd`.
+
+O conhecimento de Netplan permanece válido para outros ambientes Ubuntu e não é descartado.
 
 ---
 
-# Objetivos
-
-Ao final, você deverá conseguir:
+## Objetivos
 
 - distinguir `host0` e `lab0`;
-- configurar IPv4 estático somente na rede de laboratório;
-- validar uma configuração Netplan;
-- testar comunicação entre servidor e cliente;
-- interpretar `ip addr`, `ip route` e `ip neigh`;
-- acessar o cliente a partir do servidor;
-- preservar o acesso administrativo do servidor.
+- compreender a relação entre Netplan e `systemd-networkd`;
+- configurar IPv4 persistente na `lab0`;
+- testar comunicação cliente-servidor;
+- acessar o cliente pela rede interna;
+- preservar a interface administrativa.
 
 ---
 
-# 1. Entre no servidor
-
-No Windows:
-
-```powershell
-ssh -p SUA_PORTA SEU_USUARIO@172.16.2.34
-```
-
-No servidor:
-
-```bash
-whoami
-hostname
-ip -br addr
-ip route
-```
-
-Confirme:
+## 1. Topologia
 
 ```text
-[ ] host0 existe
-[ ] lab0 existe
-[ ] a rota default não utiliza lab0
+PC Windows
+   │ SSH :22NN
+   ▼
+srv-r2-sNN
+├── host0 → gerenciamento/Internet
+└── lab0  → 192.168.50.10/24
+              │
+              ▼
+           lab0
+       cli-r2-sNN
+       192.168.50.20/24
 ```
+
+Todos os estudantes podem utilizar `192.168.50.0/24` porque cada laboratório é isolado.
 
 ---
 
-# 2. Regra da aula
+## 2. Regra principal
 
-A configuração experimental será feita **somente em `lab0`**.
-
-Não modifique:
+Não altere:
 
 ```text
 host0
+rota default da host0
+SSH administrativo
+porta interna 22
 ```
 
-Não crie em `lab0`:
+A interface de experimentação é:
 
 ```text
-gateway4
-default route
-rota default
+lab0
 ```
 
 ---
 
-# 3. Faça backup da configuração atual
-
-Veja os arquivos existentes:
-
-```bash
-ls -l /etc/netplan/
-```
-
-Crie uma pasta de backup:
-
-```bash
-sudo mkdir -p /root/backup-netplan-aula06
-```
-
-Copie:
-
-```bash
-sudo cp -a /etc/netplan/. /root/backup-netplan-aula06/
-```
-
----
-
-# 4. Configure `lab0` no servidor
-
-Crie:
-
-```bash
-sudo nano /etc/netplan/90-redes2-lab.yaml
-```
-
-Conteúdo:
-
-```yaml
-network:
-  version: 2
-  ethernets:
-    lab0:
-      dhcp4: false
-      addresses:
-        - 192.168.50.10/24
-```
-
-Valide a sintaxe:
-
-```bash
-sudo netplan generate
-```
-
-Se não houver erro:
-
-```bash
-sudo netplan apply
-```
-
-Verifique:
-
-```bash
-ip -br addr show lab0
-```
-
-Resultado esperado:
-
-```text
-lab0    UP    192.168.50.10/24
-```
-
----
-
-# 5. Observe as rotas novamente
-
-```bash
-ip route
-```
-
-Você deverá encontrar uma rota para:
-
-```text
-192.168.50.0/24
-```
-
-pela `lab0`.
-
-A rota `default` deve continuar associada à interface de gerenciamento.
-
-Responda:
-
-```text
-Rede conectada pela lab0:
-____________________________________
-
-Interface da rota default:
-____________________________________
-```
-
----
-
-# 6. Acesso inicial ao cliente
-
-O professor ativará seu cliente e disponibilizará o acesso inicial.
-
-Do **servidor**, teste:
-
-```bash
-ping -c 3 192.168.50.20
-```
-
-Se houver resposta:
-
-```bash
-ssh SEU_USUARIO@192.168.50.20
-```
-
-Use a credencial indicada pelo professor para o cliente.
-
-Depois confirme:
+## 3. Observe o ambiente
 
 ```bash
 whoami
 hostname
 ip -br addr
+ip route
+systemctl is-active systemd-networkd
+ls -l /etc/systemd/network/
+ls -l /etc/netplan/
 ```
 
-O hostname deverá seguir o padrão:
+Resultado esperado para o serviço:
 
 ```text
-cli-r2-sNN
+active
 ```
+
+O diretório `/etc/netplan/` pode estar vazio neste laboratório.
 
 ---
 
-# 7. Configure `lab0` no cliente
-
-No cliente:
-
-```bash
-sudo mkdir -p /root/backup-netplan-aula06
-sudo cp -a /etc/netplan/. /root/backup-netplan-aula06/
-```
+## 4. Configure a `lab0` do servidor
 
 Crie:
 
 ```bash
-sudo nano /etc/netplan/90-redes2-lab.yaml
+sudo nano /etc/systemd/network/80-lab0.network
 ```
 
 Conteúdo:
 
-```yaml
-network:
-  version: 2
-  ethernets:
-    lab0:
-      dhcp4: false
-      addresses:
-        - 192.168.50.20/24
+```ini
+[Match]
+Name=lab0
+
+[Network]
+Address=192.168.50.10/24
+LinkLocalAddressing=no
+IPv6AcceptRA=no
 ```
 
-Valide:
+---
+
+## 5. Recarregue
 
 ```bash
-sudo netplan generate
-```
-
-Aplique:
-
-```bash
-sudo netplan apply
+sudo networkctl reload
+sudo networkctl reconfigure lab0
 ```
 
 Confira:
 
 ```bash
 ip -br addr show lab0
-ip route
 ```
 
-> O cliente não precisa de gateway na `lab0` para conversar com o servidor na mesma rede.
+Esperado:
+
+```text
+lab0    UP    192.168.50.10/24
+```
+
+### Se a interface não for reaplicada imediatamente
+
+A configuração persistente continua no arquivo `.network`. O estado atual pode ser ajustado com:
+
+```bash
+sudo ip link set lab0 up
+sudo ip -4 addr flush dev lab0
+sudo ip addr add 192.168.50.10/24 dev lab0
+```
+
+Distinção:
+
+```text
+/etc/systemd/network/80-lab0.network
+→ configuração persistente
+
+ip addr add
+→ estado atual da interface
+```
 
 ---
 
-# 8. Teste nos dois sentidos
-
-No cliente:
+## 6. Verifique as rotas
 
 ```bash
-ping -c 3 192.168.50.10
+ip route
 ```
+
+Deve existir:
+
+```text
+192.168.50.0/24 dev lab0
+```
+
+A rota `default` deve continuar pela interface de gerenciamento.
+
+Não configure gateway na `lab0`.
+
+---
+
+## 7. Cliente
+
+O cliente foi preparado com:
+
+```text
+cli-r2-sNN
+lab0 = 192.168.50.20/24
+```
+
+Arquivo:
+
+```text
+/etc/systemd/network/80-lab0.network
+```
+
+Conteúdo:
+
+```ini
+[Match]
+Name=lab0
+
+[Network]
+Address=192.168.50.20/24
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+```
+
+---
+
+## 8. Teste a comunicação
 
 No servidor:
 
@@ -285,154 +212,116 @@ No servidor:
 ping -c 3 192.168.50.20
 ```
 
-Agora observe a tabela de vizinhos:
-
-```bash
-ip neigh
-```
-
-Localize o endereço da outra máquina.
-
----
-
-# 9. O que `ip neigh` mostrou?
-
-Ethernet não utiliza somente endereços IPv4.
-
-Depois da comunicação, o sistema pode armazenar uma associação entre:
-
-```text
-IPv4
-  ↕
-endereço MAC
-```
-
-Registre uma linha observada:
-
-```text
-____________________________________________________________
-```
-
----
-
-# 10. Teste SSH pela rede de laboratório
-
-A partir do servidor:
+Depois:
 
 ```bash
 ssh SEU_USUARIO@192.168.50.20
 ```
 
-Pergunta:
+O cliente utiliza o mesmo usuário do servidor e a senha inicial fornecida pela disciplina. Não é necessário trocar a senha do cliente.
 
-### Esta conexão utiliza a porta externa `22NN` do host?
+No cliente:
 
-```text
-☐ Sim
-☐ Não
-```
-
-Explique:
-
-```text
-____________________________________________________________
+```bash
+whoami
+hostname
+ip -br addr
+ip route
+ping -c 3 192.168.50.10
 ```
 
 ---
 
-# 11. Prepare a evidência da atividade
-
-No servidor, entre no seu portfólio:
+## 9. Observe a vizinhança
 
 ```bash
-cd ~/SEU_REPOSITORIO
+ip neigh
 ```
 
-Crie:
+Relacione o IPv4 da outra máquina ao respectivo endereço MAC.
+
+---
+
+## 10. O incidente do Netplan
+
+Registre:
+
+```text
+Por que não continuamos usando Netplan neste laboratório?
+
+Qual serviço gerencia diretamente as interfaces?
+
+Qual a diferença entre configuração persistente e alteração feita com `ip addr`?
+```
+
+---
+
+## 11. Portfólio
 
 ```bash
 mkdir -p rede/aula-06
 ```
 
-Salve a configuração do servidor:
+Salve a configuração:
 
 ```bash
-sudo cat /etc/netplan/90-redes2-lab.yaml \
-  > rede/aula-06/netplan-servidor.yaml
+sudo cat /etc/systemd/network/80-lab0.network   > rede/aula-06/80-lab0-servidor.network
 ```
 
-A partir do cliente, copie ou registre a configuração utilizada nele.
-
-Crie:
-
-```bash
-nano rede/aula-06/README.md
-```
-
-Inclua:
+Crie `rede/aula-06/README.md` contendo:
 
 ```markdown
 # Aula 06 — Rede individual
 
 ## Topologia
-
 Servidor:
 Cliente:
 Rede:
 
 ## Interfaces
+Servidor host0:
+Servidor lab0:
+Cliente lab0:
 
-### Servidor
-- host0:
-- lab0:
-
-### Cliente
-- lab0:
+## Persistência
+Ferramenta:
+Arquivo:
 
 ## Testes
-- servidor → cliente:
-- cliente → servidor:
+Servidor → cliente:
+Cliente → servidor:
+SSH pela lab0:
 
-## Rotas
-- rota da rede de laboratório:
-- rota default do servidor:
+## Netplan e systemd-networkd
+Explique o problema encontrado e a solução adotada.
 
 ## Conclusão
-Explique por que host0 e lab0 possuem funções diferentes.
+Explique a diferença entre host0 e lab0.
 ```
 
 ---
 
-# 12. Não faça o commit ainda
-
-A Aula 06 e a Aula 07 formam um único marco:
-
-```text
-rede + troubleshooting
-```
-
-Por enquanto:
+## 12. Commit
 
 ```bash
 git status
+git add rede/aula-06/
+git commit -m "Configura rede de laboratorio com systemd-networkd"
+git push
 ```
-
-Confira se os arquivos estão no local correto.
-
-O commit será concluído após a atividade de diagnóstico da Aula 07.
 
 ---
 
-# Checklist
+## Checklist
 
 ```text
-[ ] host0 foi preservada.
-[ ] servidor possui 192.168.50.10/24 em lab0.
-[ ] cliente possui 192.168.50.20/24 em lab0.
-[ ] não existe gateway padrão pela lab0.
-[ ] servidor pinga cliente.
-[ ] cliente pinga servidor.
-[ ] observei ip neigh.
-[ ] acessei o cliente via SSH pela rede interna.
-[ ] documentei a topologia no portfólio.
+[ ] preservei host0.
+[ ] servidor possui 192.168.50.10/24.
+[ ] cliente possui 192.168.50.20/24.
+[ ] servidor e cliente se comunicam.
+[ ] acessei o cliente via SSH.
+[ ] observei rotas e vizinhança.
+[ ] compreendi Netplan x systemd-networkd.
+[ ] documentei a solução.
+[ ] concluí o commit da Aula 06.
 ```

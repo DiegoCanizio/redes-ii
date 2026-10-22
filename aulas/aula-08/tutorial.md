@@ -1,325 +1,158 @@
-# Aula 08 — DHCP: protocolo e implantação inicial
+# Aula 08 — DHCP: leases, reserva e diagnóstico
 
 **Data:** 27/10/2026  
 **Duração:** 100 minutos
 
----
+## Objetivo
 
-## Situação-problema
-
-Na Aula 06 o cliente recebeu manualmente:
+Aprofundar o DHCP já funcional. O cliente passará a receber sempre:
 
 ```text
-192.168.50.20/24
+192.168.50.50/24
 ```
 
-Isso funciona em uma rede pequena de laboratório, mas não escala.
+por meio de uma reserva baseada no MAC de `lab0`.
 
-Hoje o servidor começará a fornecer configuração IPv4 automaticamente:
+O pool dinâmico continua:
 
 ```text
-cli-r2-sNN
-     │
-     │ DHCP
-     ▼
-srv-r2-sNN
-lab0: 192.168.50.10/24
+192.168.50.100–192.168.50.150
 ```
 
----
+## 1. Confirme o estado inicial
 
-# Objetivos
+Servidor:
 
-- compreender o processo DHCP;
-- identificar portas UDP 67 e 68;
-- instalar e iniciar o Kea DHCP;
-- criar um pool;
-- fazer o cliente obter endereço automaticamente;
-- observar o protocolo em captura.
-
----
-
-# 1. O processo DORA
-
-O processo inicial pode ser representado como:
-
-```text
-CLIENTE                         SERVIDOR
-   │                               │
-   │──── DHCPDISCOVER ────────────>│
-   │<──── DHCPOFFER ───────────────│
-   │──── DHCPREQUEST ─────────────>│
-   │<──── DHCPACK ─────────────────│
+```bash
+ip -br addr show lab0
+systemctl is-active kea-dhcp4-server
+sudo ss -lunp | grep ':67'
 ```
 
-Portas:
-
-```text
-Servidor DHCP → UDP/67
-Cliente DHCP  → UDP/68
-```
-
----
-
-# 2. Confirme a rede do servidor
-
-No servidor:
+Cliente:
 
 ```bash
 ip -br addr show lab0
 ```
 
-Deve existir:
+## 2. Observe o lease
 
-```text
-192.168.50.10/24
-```
-
-Se não existir, corrija a rede antes de continuar.
-
----
-
-# 3. Instale o Kea
-
-No servidor:
+Servidor:
 
 ```bash
-sudo apt update
-sudo apt install -y kea-dhcp4-server
+sudo cat /var/lib/kea/kea-leases4.csv
+```
+
+Identifique:
+
+- endereço concedido;
+- MAC;
+- validade;
+- hostname, quando disponível.
+
+## 3. Descubra o MAC da `lab0`
+
+No cliente:
+
+```bash
+ip link show lab0
+```
+
+Registre o MAC.
+
+## 4. Crie a reserva
+
+No servidor, dentro da subnet de `192.168.50.0/24`, acrescente:
+
+```json
+"reservations": [
+  {
+    "hw-address": "SEU:MAC:AQUI",
+    "ip-address": "192.168.50.50"
+  }
+]
+```
+
+A reserva pode ficar fora do pool dinâmico, desde que permaneça dentro da subnet.
+
+## 5. Valide
+
+```bash
+python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+sudo systemctl restart kea-dhcp4-server
+```
+
+## 6. Renove o cliente
+
+No cliente:
+
+```bash
+sudo networkctl renew lab0
 ```
 
 Verifique:
 
 ```bash
-systemctl status kea-dhcp4-server
+ip -br addr show lab0
 ```
 
-O serviço pode ainda não estar pronto para uso. Isso é esperado antes da configuração.
-
----
-
-# 4. Faça backup
-
-```bash
-sudo cp /etc/kea/kea-dhcp4.conf \
-  /etc/kea/kea-dhcp4.conf.bak-aula08
-```
-
----
-
-# 5. Configure o DHCP
-
-Edite:
-
-```bash
-sudo nano /etc/kea/kea-dhcp4.conf
-```
-
-Utilize como base:
-
-```json
-{
-  "Dhcp4": {
-    "interfaces-config": {
-      "interfaces": [ "lab0" ]
-    },
-
-    "lease-database": {
-      "type": "memfile",
-      "persist": true,
-      "name": "/var/lib/kea/kea-leases4.csv"
-    },
-
-    "valid-lifetime": 600,
-    "renew-timer": 300,
-    "rebind-timer": 500,
-
-    "subnet4": [
-      {
-        "subnet": "192.168.50.0/24",
-
-        "pools": [
-          {
-            "pool": "192.168.50.100 - 192.168.50.150"
-          }
-        ],
-
-        "option-data": [
-          {
-            "name": "domain-name-servers",
-            "data": "192.168.50.10"
-          },
-          {
-            "name": "domain-name",
-            "data": "empresa.test"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
----
-
-# 6. Valide antes de reiniciar
-
-Valide JSON:
-
-```bash
-python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
-```
-
-Valide o Kea:
-
-```bash
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-```
-
-Se houver erro:
+Esperado:
 
 ```text
-NÃO reinicie o serviço.
+192.168.50.50/24
 ```
 
-Corrija primeiro.
+Se o lease anterior persistir, reconfigure/reinicie `systemd-networkd` conforme orientação do professor.
 
----
+## 7. Produza evidências
 
-# 7. Inicie o serviço
+Servidor:
 
 ```bash
-sudo systemctl restart kea-dhcp4-server
+sudo cat /var/lib/kea/kea-leases4.csv
+sudo journalctl -u kea-dhcp4-server -n 40 --no-pager
 ```
 
-Confira:
-
-```bash
-systemctl is-active kea-dhcp4-server
-```
-
-Depois:
-
-```bash
-sudo ss -lunp | grep ':67'
-```
-
----
-
-# 8. Prepare a captura DHCP
-
-No servidor:
-
-```bash
-sudo tcpdump -i lab0 -nn -vvv \
-  'udp port 67 or udp port 68'
-```
-
-Mantenha a captura aberta.
-
----
-
-# 9. Altere o cliente para DHCP
-
-No cliente, edite:
-
-```bash
-sudo nano /etc/netplan/90-redes2-lab.yaml
-```
-
-Use:
-
-```yaml
-network:
-  version: 2
-  ethernets:
-    lab0:
-      dhcp4: true
-```
-
-Valide:
-
-```bash
-sudo netplan generate
-```
-
-Depois:
-
-```bash
-sudo netplan apply
-```
-
-> A conexão SSH atual com o cliente pode ser encerrada porque o endereço está mudando. Isso é esperado.
-
----
-
-# 10. Descubra o endereço concedido
-
-No servidor:
-
-```bash
-sudo tail -n 10 /var/lib/kea/kea-leases4.csv
-```
-
-Também consulte:
-
-```bash
-sudo journalctl -u kea-dhcp4-server -n 30 --no-pager
-```
-
-Identifique o endereço concedido ao cliente.
-
----
-
-# 11. Reconecte ao cliente
-
-A partir do servidor:
-
-```bash
-ssh SEU_USUARIO@IP_RECEBIDO
-```
-
-No cliente:
+Cliente:
 
 ```bash
 ip -br addr show lab0
-ip route
+ping -c 3 192.168.50.10
 ```
 
----
+## 8. Diagnóstico
 
-# 12. Relacione com a captura
+O professor introduzirá uma falha simples relacionada ao DHCP.
 
-Na captura do servidor, procure mensagens DHCP.
-
-Tente identificar:
+Use:
 
 ```text
-Discover
-Offer
-Request
-Ack
+Sintoma → Hipótese → Teste → Evidência → Causa → Correção → Validação
 ```
 
-Nem toda renovação exibe necessariamente a sequência inicial completa. O importante é relacionar o tráfego observado com o funcionamento do protocolo.
+Ferramentas úteis:
 
----
+```bash
+systemctl status kea-dhcp4-server
+sudo ss -lunp | grep ':67'
+sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
+sudo journalctl -u kea-dhcp4-server -n 30 --no-pager
+ip -br addr
+```
 
-# 13. Não faça o commit ainda
+## Portfólio
 
-A Aula 08 e a Aula 09 formam o marco:
+Crie:
 
 ```text
-DHCP
+dhcp/aula-08/
+├── README.md
+└── kea-dhcp4-reserva.conf
 ```
 
-Hoje concentre-se em fazer o serviço funcionar e anotar dúvidas.
+O README deve conter MAC, lease anterior, reserva, evidências e diagnóstico.
 
-Na próxima aula entraremos em:
+### Marco DHCP
 
-- leases;
-- reservas;
-- renovação;
-- logs;
-- diagnóstico;
-- documentação final.
+Ao final desta aula, o bloco DHCP deve estar versionado e funcional.

@@ -1,329 +1,177 @@
-# Aula 09 — DHCP: leases, reservas e diagnóstico
+# Aula 09 — DNS por dentro e primeira zona BIND
 
 **Data:** 29/10/2026  
 **Duração:** 150 minutos
 
----
-
 ## Objetivo
 
-Partindo do DHCP funcional da Aula 08, hoje você deverá:
-
-- interpretar leases;
-- identificar o cliente pelo MAC;
-- criar uma reserva;
-- validar opções entregues ao cliente;
-- provocar e diagnosticar uma falha;
-- documentar o serviço no portfólio.
-
----
-
-# 1. Confirme o estado inicial
-
-No servidor:
-
-```bash
-ip -br addr show lab0
-systemctl is-active kea-dhcp4-server
-sudo ss -lunp | grep ':67'
-```
-
-No cliente:
-
-```bash
-ip -br addr show lab0
-```
-
----
-
-# 2. Observe os leases
-
-No servidor:
-
-```bash
-sudo cat /var/lib/kea/kea-leases4.csv
-```
-
-Localize:
-
-```text
-address
-hwaddr
-valid_lifetime
-expire
-hostname
-```
-
-O arquivo é estado de execução. Não é o principal arquivo de configuração.
-
----
-
-# 3. Descubra o MAC do cliente
-
-No cliente:
-
-```bash
-ip link show lab0
-```
-
-Localize:
-
-```text
-link/ether
-```
-
-Registre:
-
-```text
-MAC do cliente:
-____________________________________
-```
-
----
-
-# 4. Crie uma reserva
-
-No servidor, edite:
-
-```bash
-sudo nano /etc/kea/kea-dhcp4.conf
-```
-
-Dentro da subnet, adicione:
-
-```json
-"reservations": [
-  {
-    "hw-address": "MAC_DO_CLIENTE",
-    "ip-address": "192.168.50.50",
-    "hostname": "cliente"
-  }
-]
-```
-
-Atenção à posição das vírgulas no JSON.
-
----
-
-# 5. Valide novamente
-
-```bash
-python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
-```
-
-```bash
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-```
-
-Somente depois:
-
-```bash
-sudo systemctl restart kea-dhcp4-server
-```
-
----
-
-# 6. Faça o cliente solicitar novamente
-
-Uma reserva nova não necessariamente substitui imediatamente um lease ainda válido.
-
-Para o laboratório, o professor poderá orientar a limpeza controlada do lease anterior.
-
-Depois, no cliente:
-
-```bash
-sudo networkctl renew lab0
-```
-
-Se necessário:
-
-```bash
-sudo systemctl restart systemd-networkd
-```
-
-A sessão SSH pode cair temporariamente.
-
-No servidor, confirme:
-
-```bash
-sudo tail -n 10 /var/lib/kea/kea-leases4.csv
-```
-
-Resultado esperado para o cliente reservado:
-
-```text
-192.168.50.50
-```
-
----
-
-# 7. Verifique as opções entregues
-
-No cliente:
-
-```bash
-ip -br addr show lab0
-ip route
-```
-
-Quando disponível:
-
-```bash
-resolvectl status lab0
-```
-
-Observe se o servidor DNS informado pelo DHCP é:
-
-```text
-192.168.50.10
-```
-
-e se o domínio é:
+Compreender o DNS como cliente e, em seguida, transformar o servidor em autoritativo para:
 
 ```text
 empresa.test
 ```
 
-O DNS ainda será implantado nas próximas aulas. Hoje estamos verificando apenas a informação entregue pelo DHCP.
-
----
-
-# 8. Logs e evidências
-
-No servidor:
+Ao final, consultas explícitas ao servidor devem funcionar:
 
 ```bash
-sudo journalctl -u kea-dhcp4-server -n 50 --no-pager
+dig @192.168.50.10 srv.empresa.test A
+dig @192.168.50.10 www.empresa.test
 ```
 
-Capture uma nova renovação:
+## 1. DNS antes do BIND
+
+O servidor possui acesso externo pela `host0`. Use-o para observar DNS público:
 
 ```bash
-sudo tcpdump -i lab0 -nn -vvv \
-  'udp port 67 or udp port 68'
+resolvectl status
+dig example.com A
+dig example.com AAAA
+dig example.com NS
+dig gmail.com MX
 ```
 
----
-
-# 9. Incidente DHCP
-
-O professor indicará um incidente ou uma condição incorreta.
-
-Utilize:
+Identifique em uma resposta:
 
 ```text
-Sintoma
-→ Hipótese
-→ Teste
-→ Evidência
-→ Causa
-→ Correção
-→ Validação
+status
+QUESTION
+ANSWER
+TTL
 ```
 
-Ferramentas úteis:
+## 2. Consulte um servidor específico
 
 ```bash
-systemctl status kea-dhcp4-server
-journalctl -u kea-dhcp4-server
-sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
-sudo ss -lunp
-ip -br addr
-tcpdump
+dig @1.1.1.1 example.com A
 ```
 
----
-
-# 10. Portfólio
-
-No servidor:
+Compare com:
 
 ```bash
-cd ~/SEU_REPOSITORIO
-mkdir -p dhcp
+dig example.com A
 ```
 
-Salve a configuração:
+## 3. Observe o tráfego DNS
+
+Descubra a interface da rota padrão:
 
 ```bash
-sudo cat /etc/kea/kea-dhcp4.conf > dhcp/kea-dhcp4.conf
+ip route show default
 ```
 
-Crie:
+Capture nela:
 
 ```bash
-nano dhcp/README.md
+sudo tcpdump -i host0 -nn 'port 53'
 ```
 
-Estrutura sugerida:
-
-```markdown
-# DHCP com Kea
-
-## Rede
-- servidor:
-- rede:
-- pool:
-
-## Cliente
-- MAC:
-- endereço inicialmente recebido:
-- endereço reservado:
-
-## Opções DHCP
-- DNS:
-- domínio:
-
-## Testes
-- serviço:
-- porta:
-- lease:
-- renovação:
-
-## Troubleshooting
-Sintoma:
-Hipótese:
-Teste:
-Evidência:
-Causa:
-Correção:
-Validação:
-```
-
-> Não versione arquivos temporários de lease como se fossem configuração.
-
----
-
-# 11. Marco DHCP
-
-Confira:
+Em outro terminal:
 
 ```bash
-git status
+dig iana.org A
+```
+
+## 4. Instale o BIND
+
+```bash
+sudo apt update
+sudo apt install -y bind9 bind9-utils dnsutils
+```
+
+No Ubuntu 26.04, o pacote é `bind9`, mas a unidade systemd utilizada pelo serviço é `named.service`.
+
+## 5. Restrinja o serviço ao laboratório
+
+Edite:
+
+```bash
+sudo nano /etc/bind/named.conf.options
+```
+
+Mantenha as opções existentes necessárias e garanta conceitualmente:
+
+```conf
+listen-on { 127.0.0.1; 192.168.50.10; };
+listen-on-v6 { none; };
+allow-query { localhost; 192.168.50.0/24; };
+```
+
+O objetivo é que o BIND responda ao cliente pela `lab0`.
+
+## 6. Declare a zona direta
+
+```bash
+sudo nano /etc/bind/named.conf.local
+```
+
+Adicione:
+
+```conf
+zone "empresa.test" {
+    type master;
+    file "/etc/bind/db.empresa.test";
+};
+```
+
+## 7. Crie a zona
+
+```bash
+sudo nano /etc/bind/db.empresa.test
+```
+
+Exemplo:
+
+```dns
+$TTL 300
+@   IN  SOA ns1.empresa.test. admin.empresa.test. (
+        2026102901
+        3600
+        900
+        604800
+        300
+)
+
+        IN  NS      ns1.empresa.test.
+        IN  MX 10   mail.empresa.test.
+
+ns1     IN  A       192.168.50.10
+srv     IN  A       192.168.50.10
+mail    IN  A       192.168.50.10
+www     IN  CNAME   srv.empresa.test.
+```
+
+## 8. Valide antes de reiniciar
+
+```bash
+sudo named-checkconf
+sudo named-checkzone empresa.test /etc/bind/db.empresa.test
 ```
 
 Depois:
 
 ```bash
-git add dhcp/
-git status
-git commit -m "Implanta e documenta DHCP com Kea"
-git push
+sudo systemctl restart named
+systemctl is-active named
+sudo ss -luntp | grep ':53'
 ```
 
----
+## 9. Teste pelo cliente
 
-# Checklist
-
-```text
-[ ] Kea escuta somente na interface de laboratório.
-[ ] pool está correto.
-[ ] cliente obtém endereço por DHCP.
-[ ] identifiquei o lease.
-[ ] criei reserva para o cliente.
-[ ] cliente recebeu 192.168.50.50.
-[ ] DHCP informa DNS 192.168.50.10.
-[ ] DHCP informa domínio empresa.test.
-[ ] usei logs/captura como evidência.
-[ ] documentei e versionei o serviço.
+```bash
+dig @192.168.50.10 empresa.test NS
+dig @192.168.50.10 srv.empresa.test A
+dig @192.168.50.10 www.empresa.test
+dig @192.168.50.10 empresa.test MX
 ```
+
+Nesta etapa ainda usamos `@192.168.50.10` de propósito. O DHCP ainda não informou ao cliente qual DNS deve utilizar.
+
+## Portfólio
+
+Registre em `dns/aula-09/`:
+
+- função de A, AAAA, NS, MX e CNAME;
+- diferença entre resolver padrão e consulta com `@servidor`;
+- `named.conf.local`;
+- zona direta;
+- evidências de porta 53 e consultas.
