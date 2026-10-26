@@ -444,11 +444,10 @@ active
 ---
 
 # 5. Identifique seu caso
-Identifique seu caso de acordo com as configurações e diagnóstico do **CLIENTE.**
 
 ## Caso A — o arquivo ainda contém `Address=192.168.50.20/24`
 
-O **CLIENTE** ainda está configurado estaticamente.
+O cliente ainda está configurado estaticamente.
 
 Edite:
 
@@ -496,9 +495,9 @@ Confira:
 ip -4 -br addr show lab0
 ```
 
-- Se aparecerem `.20` e um IP entre `.100` e `.150`, siga para o **Caso C**.
-- Se aparecer **apenas** um IP entre `.100` e `.150`, siga para o **Caso D**.
-- Se continuar **apenas** `.20`, siga para o **Caso B**.
+- Se aparecerem `.20` e um IP do pool, siga para o **Caso C**.
+- Se aparecer apenas um IP do pool, siga para o **Caso D**.
+- Se continuar apenas `.20`, siga para o **Caso B**.
 
 ---
 
@@ -670,7 +669,7 @@ sudo journalctl -u kea-dhcp4-server -n 30 --no-pager
 sudo tail -n 20 /var/lib/kea/kea-leases4.csv
 ```
 
-Se ainda não houver endereço, abra no **servidor**:
+Se ainda não houver endereço, abra no servidor:
 
 ```bash
 sudo tcpdump -i lab0 -nn 'udp port 67 or udp port 68'
@@ -816,6 +815,8 @@ Use as evidências para decidir o próximo passo.
 [ ] servidor possui 192.168.50.10/24
 [ ] rota default do servidor continua pela host0
 [ ] systemd-networkd está active
+[ ] arquivo .network aplicado à lab0 foi identificado
+[ ] não existem conflitos entre arquivos .network para lab0
 [ ] JSON do Kea é válido
 [ ] kea-dhcp4 -t não apresenta ERROR
 [ ] kea-dhcp4-server está active
