@@ -43,7 +43,7 @@ cliente.empresa.test
 
 ---
 
-# 1. Retome e valide a zona direta — 10 min
+# 1. Retome e valide a zona direta
 
 Antes de criar a zona reversa, confirme que a Aula 09 continua funcional.
 
@@ -80,7 +80,7 @@ Se a zona direta não estiver funcional, corrija-a antes de continuar.
 
 ---
 
-# 2. Entenda a resolução reversa — 15 min
+# 2. Entenda a resolução reversa 
 
 Na resolução direta perguntamos:
 
@@ -172,7 +172,7 @@ a consulta completa envolve:
 
 ---
 
-# 3. Crie a zona reversa — 25 min
+# 3. Crie a zona reversa 
 
 ## 3.1 Declare a zona
 
@@ -262,7 +262,7 @@ cliente.empresa.test
 
 ---
 
-# 4. Valide e teste — 15 min
+# 4. Valide e teste 
 
 ## 4.1 Valide a configuração
 
@@ -336,7 +336,7 @@ dig @192.168.50.10 cliente.empresa.test A
 
 ---
 
-# 5. Diagnóstico DNS em camadas — 15 min
+# 5. Diagnóstico DNS em camadas 
 
 A partir de agora, não comece um diagnóstico alterando arquivos.
 
@@ -464,7 +464,7 @@ Também precisamos perguntar:
 
 ---
 
-# 6. Incidente controlado — 15 min
+# 6. Incidente controlado 
 
 O professor introduzirá uma inconsistência em uma configuração DNS.
 
@@ -545,7 +545,7 @@ ________________________________________
 
 ---
 
-# 7. Fechamento — 5 min
+# 7. Fechamento 
 
 Ao final das Aulas 09 e 10 temos:
 

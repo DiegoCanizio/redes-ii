@@ -43,7 +43,7 @@ empresa.test
 
 ---
 
-# 1. Verifique o estado inicial — 10 min
+# 1. Verifique o estado inicial 
 
 Antes de configurar DNS, confirme que a rede construída nas aulas anteriores está funcionando.
 
@@ -81,7 +81,7 @@ cliente.empresa.test
 
 ---
 
-# 2. DNS antes do BIND — 25 min
+# 2. DNS antes do BIND 
 
 ## 2.1 Observe o resolvedor atual
 
@@ -198,7 +198,7 @@ será utilizado durante os testes do nosso BIND.
 
 ---
 
-# 3. Observe DNS na rede — 15 min
+# 3. Observe DNS na rede 
 
 Descubra a interface utilizada pela rota padrão:
 
@@ -244,7 +244,7 @@ Ctrl+C
 
 ---
 
-# 4. Instale e conheça o BIND — 15 min
+# 4. Instale e conheça o BIND
 
 Instale os pacotes:
 
@@ -275,7 +275,7 @@ Neste momento, o serviço existe, mas ainda não criamos a nossa zona.
 
 ---
 
-# 5. Restrinja o BIND ao laboratório — 15 min
+# 5. Restrinja o BIND ao laboratório 
 
 Edite:
 
@@ -316,7 +316,7 @@ Se o comando não apresentar erro, prossiga.
 
 ---
 
-# 6. Construa a zona direta `empresa.test` — 35 min
+# 6. Construa a zona direta `empresa.test`
 
 ## 6.1 Declare a zona
 
@@ -464,7 +464,7 @@ Nesta aula não configuraremos um serviço de e-mail; estamos apenas criando o r
 
 ---
 
-# 7. Valide e teste a zona — 25 min
+# 7. Valide e teste a zona
 
 ## 7.1 Valide a configuração global
 
@@ -584,7 +584,7 @@ Isso será resolvido quando integrarmos DHCP e DNS.
 
 ---
 
-# 8. Primeira rotina de diagnóstico DNS — 10 min
+# 8. Primeira rotina de diagnóstico DNS 
 
 Uma configuração DNS deve ser verificada em camadas.
 
