@@ -1,7 +1,12 @@
 # Aula 11 — Integração DHCP + DNS e troubleshooting integrado
 
-**Data:** 05/11/2026  
-**Duração:** 150 minutos
+**Data:** 05/11/2026
+
+**Duração:** 60 minutos — segundo bloco do encontro
+
+## Organização do encontro
+
+Segundo bloco do encontro de 05/11, após a Aula 10. Priorize as etapas 1 a 6: preservar pool/reserva, entregar DNS pelo DHCP e resolver nomes sem `@servidor`. O incidente da etapa 7 e seu registro completo serão retomados em 24/11. A integração entrega opções DNS; não configura atualização dinâmica de registros.
 
 ## Objetivo
 
@@ -59,7 +64,7 @@ Preserve pool e reserva.
 ## 3. Valide e aplique
 
 ```bash
-python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
+sudo python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
 sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
 sudo systemctl restart kea-dhcp4-server
 ```

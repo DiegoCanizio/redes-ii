@@ -1,6 +1,7 @@
 # Aula 15 — Avaliação 1
 
-**Data prevista:** 19/11/2026  
+**Data prevista:** 26/11/2026
+
 **Duração:** 150 minutos
 
 Este encontro será destinado à **Avaliação 1** da disciplina.

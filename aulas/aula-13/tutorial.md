@@ -1,7 +1,12 @@
 # Aula 13 — Nginx, virtual host, DNS e logs
 
-**Data:** 12/11/2026  
-**Duração:** 150 minutos
+**Data:** 17/11/2026
+
+**Duração:** 70 minutos — segundo bloco do encontro
+
+## Organização do encontro
+
+Segundo bloco do encontro de 17/11. Execute as etapas 1 a 8: um virtual host, validação, teste com `--resolve`, acesso por nome e logs. A etapa 9 (incidente integrado) será realizada em 24/11; seu registro no portfólio será concluído nessa data. HTTPS, proxy reverso e múltiplos sites não são requisitos da primeira avaliação.
 
 ## Objetivo
 

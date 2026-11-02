@@ -5,22 +5,36 @@ Esta pasta contém os roteiros públicos da disciplina **Redes de Computadores I
 ## Primeiro bloco
 
 ```text
-01  Git/GitHub e portfólio
-02  Linux + Bash + comandos de rede
-03  IPv4 + rotas + Netplan
-04  SSH
-05  servidor persistente
-06  rede cliente-servidor
-07  troubleshooting + tcpdump
-08  DHCP: protocolo e implantação
-09  DHCP: leases + reservas
-10  DNS: resolução + dig
-11  BIND9
-12  integração DHCP + DNS
-13  HTTP + Nginx
-14  laboratório integrado
+01  Git, GitHub e início do portfólio
+02  Linux básico, comandos de rede e primeiro script Bash
+03  Interfaces, endereçamento, rotas e Netplan
+04  SSH: serviço, porta, configuração e acesso remoto
+05  Meu Servidor de Redes II: ambiente persistente e consolidação do SSH
+06  Rede individual cliente-servidor com systemd-networkd
+07  Troubleshooting e DHCP inicial
+08  DHCP: leases, reserva e diagnóstico
+09  DNS por dentro, BIND e primeira zona direta
+10  DNS reverso, validação e diagnóstico
+11  Integração DHCP + DNS e troubleshooting integrado
+12  HTTP por dentro
+13  Nginx, virtual host, DNS e logs
+14  Laboratório integrado e checkpoint
 15  Avaliação 1
 ```
+
+## Calendário atualizado — novembro de 2026
+
+| Data | Atividade |
+|---|---|
+| 03/11 | Aula 9 — DNS e zona direta |
+| 05/11 | Aulas 10 e 11 — DNS reverso e integração DHCP/DNS |
+| 10 e 12/11 | Eventos prováveis; sem conteúdo novo previsto |
+| 17/11 | Aulas 12 e 13 — HTTP básico e Nginx |
+| 19/11 | Sem aula |
+| 24/11 | Aula 14 — laboratório integrado e revisão |
+| 26/11 | Aula 15 — Avaliação 1 |
+
+Os números identificam os blocos de conteúdo. Dois tutoriais podem ser utilizados no mesmo encontro. Os eventos são contabilizados como encontros, sem acrescentar conteúdo aos tutoriais. As aulas 1 a 8 já foram utilizadas e testadas.
 
 ## Sobre as Aulas 01 a 04
 

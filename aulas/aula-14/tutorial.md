@@ -1,6 +1,7 @@
 # Aula 14 — Laboratório integrado e checkpoint
 
-**Data:** 17/11/2026  
+**Data:** 24/11/2026
+
 **Duração:** 100 minutos
 
 ---

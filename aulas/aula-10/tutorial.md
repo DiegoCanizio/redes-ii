@@ -1,7 +1,12 @@
 # Aula 10 — DNS reverso, validação e diagnóstico
 
-**Data:** 03/11/2026  
-**Duração:** 100 minutos
+**Data:** 05/11/2026
+
+**Duração:** 90 minutos — primeiro bloco do encontro
+
+## Organização do encontro
+
+Este tutorial e o da Aula 11 compõem o mesmo encontro de 150 minutos em 05/11. Priorize as etapas 1 a 4 (zona reversa e testes); a etapa 5 serve como referência. O incidente da etapa 6 será retomado no laboratório de 24/11. Após validar a zona reversa, siga para a Aula 11.
 
 ## Objetivos
 
@@ -219,7 +224,7 @@ Utilize:
 $TTL 300
 
 @   IN  SOA ns1.empresa.test. admin.empresa.test. (
-        2026110301
+        2026110501
         3600
         900
         604800

@@ -1,7 +1,12 @@
 # Aula 12 — HTTP por dentro
 
-**Data:** 10/11/2026  
-**Duração:** 100 minutos
+**Data:** 17/11/2026
+
+**Duração:** 30 minutos — primeiro bloco do encontro
+
+## Organização do encontro
+
+Primeiro bloco do encontro de 17/11, compartilhado com a Aula 13. Execute as etapas 1 a 4 e 7: página, servidor Python, requisição/resposta, 200, 404 e falha de conexão. As etapas 5 e 6 (requisição manual e captura) ficam para aprofundamento após a avaliação. No portfólio, registre somente as evidências realizadas. Encerre o Python e prossiga para Nginx no mesmo encontro.
 
 ## Objetivo
 
@@ -12,6 +17,24 @@ Servidor temporário da aula:
 ```text
 srv.empresa.test:8000
 ```
+
+## Preparação
+
+Se os comandos ainda não estiverem disponíveis, instale no servidor:
+
+```bash
+sudo apt update
+sudo apt install -y python3
+```
+
+No cliente:
+
+```bash
+sudo apt update
+sudo apt install -y curl
+```
+
+As etapas opcionais 5 e 6 usam também `netcat-openbsd` no cliente e `tcpdump` no servidor; instale-os quando essas atividades forem realizadas.
 
 ## 1. Crie uma página
 

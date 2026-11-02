@@ -78,7 +78,7 @@ A reserva pode ficar fora do pool dinâmico, desde que permaneça dentro da subn
 ## 5. Valide
 
 ```bash
-python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
+sudo python3 -m json.tool /etc/kea/kea-dhcp4.conf >/dev/null
 sudo kea-dhcp4 -t /etc/kea/kea-dhcp4.conf
 sudo systemctl restart kea-dhcp4-server
 ```
