@@ -1,12 +1,12 @@
 # Aula 12 — HTTP por dentro
 
-**Data:** 17/11/2026
+**Data:** 05/11/2026
 
-**Duração:** 30 minutos — primeiro bloco do encontro
+**Duração:** 30 minutos — bloco HTTP do encontro de 150 minutos
 
 ## Organização do encontro
 
-Primeiro bloco do encontro de 17/11, compartilhado com a Aula 13. Execute as etapas 1 a 4 e 7: página, servidor Python, requisição/resposta, 200, 404 e falha de conexão. As etapas 5 e 6 (requisição manual e captura) ficam para aprofundamento após a avaliação. No portfólio, registre somente as evidências realizadas. Encerre o Python e prossiga para Nginx no mesmo encontro.
+Após conferir a integração DHCP/DNS, execute as etapas 1 a 4 e 7: página, servidor Python, requisição/resposta, 200, 404 e falha de conexão. As etapas 5 e 6 (requisição manual e captura) ficam como aprofundamento após a avaliação. Registre somente as evidências realizadas. Encerre o Python e prossiga para a introdução ao Nginx no mesmo encontro.
 
 ## Objetivo
 

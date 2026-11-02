@@ -2,11 +2,11 @@
 
 **Data:** 05/11/2026
 
-**Duração:** 60 minutos — segundo bloco do encontro
+**Duração:** 30 minutos previstos — conferência inicial do encontro de 150 minutos
 
 ## Organização do encontro
 
-Segundo bloco do encontro de 05/11, após a Aula 10. Priorize as etapas 1 a 6: preservar pool/reserva, entregar DNS pelo DHCP e resolver nomes sem `@servidor`. O incidente da etapa 7 e seu registro completo serão retomados em 24/11. A integração entrega opções DNS; não configura atualização dinâmica de registros.
+Comece conferindo `resolvectl status lab0`, `dig www.empresa.test` e `getent hosts www.empresa.test` no cliente, sem indicar `@servidor`. Se já funcionarem, preserve as configurações e avance para a Aula 12 e a introdução ao Nginx. Caso contrário, conclua as etapas 1 a 6 deste tutorial. O incidente da etapa 7 pode ser retomado em 24/11. Esta integração entrega opções DNS; não configura atualização dinâmica de registros.
 
 ## Objetivo
 

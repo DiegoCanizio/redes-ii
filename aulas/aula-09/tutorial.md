@@ -1,12 +1,12 @@
 # Aula 09 — DNS por dentro, BIND e primeira zona direta
 
-**Data:** 03/11/2026
+**Data:** 29/10/2026
 
-**Duração:** 100 minutos
+**Duração:** 150 minutos
 
 ## Organização do encontro
 
-Priorize a zona direta funcionando e as consultas `A` e `CNAME`. Consultas públicas adicionais e capturas extensas são aprofundamento. No próximo encontro serão trabalhados DNS reverso e integração DHCP + DNS.
+Aula realizada em 29/10/2026, com funcionamento confirmado pelo professor. O próximo conteúdo é DNS reverso em 03/11. Este tutorial permanece como referência do que foi praticado.
 
 ## Objetivos
 
@@ -356,7 +356,7 @@ Utilize:
 $TTL 300
 
 @   IN  SOA ns1.empresa.test. admin.empresa.test. (
-        2026110301
+        2026102901
         3600
         900
         604800
@@ -396,7 +396,7 @@ O `SOA` descreve informações fundamentais da zona.
 Observe também o serial:
 
 ```text
-2026110301
+2026102901
 ```
 
 Durante a disciplina utilizaremos o padrão:

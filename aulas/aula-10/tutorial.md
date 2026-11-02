@@ -1,12 +1,12 @@
 # Aula 10 — DNS reverso, validação e diagnóstico
 
-**Data:** 05/11/2026
+**Data:** 03/11/2026
 
-**Duração:** 90 minutos — primeiro bloco do encontro
+**Duração:** 100 minutos
 
 ## Organização do encontro
 
-Este tutorial e o da Aula 11 compõem o mesmo encontro de 150 minutos em 05/11. Priorize as etapas 1 a 4 (zona reversa e testes); a etapa 5 serve como referência. O incidente da etapa 6 será retomado no laboratório de 24/11. Após validar a zona reversa, siga para a Aula 11.
+Encontro dedicado ao DNS reverso, PTR, validação e consultas com `dig -x`. Preserve a zona direta já validada na Aula 9. Execute as etapas 1 a 5; a etapa 6 pode ser aplicada conforme o tempo ou retomada na revisão. A conferência da integração DHCP/DNS e a introdução ao Nginx ocorrerão em 05/11.
 
 ## Objetivos
 
@@ -224,7 +224,7 @@ Utilize:
 $TTL 300
 
 @   IN  SOA ns1.empresa.test. admin.empresa.test. (
-        2026110501
+        2026110301
         3600
         900
         604800

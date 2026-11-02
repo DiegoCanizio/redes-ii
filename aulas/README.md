@@ -26,15 +26,17 @@ Esta pasta contém os roteiros públicos da disciplina **Redes de Computadores I
 
 | Data | Atividade |
 |---|---|
-| 03/11 | Aula 9 — DNS e zona direta |
-| 05/11 | Aulas 10 e 11 — DNS reverso e integração DHCP/DNS |
+| 27/10 | Aula 8 — realizada e validada |
+| 29/10 | Aula 9 — realizada e validada |
+| 03/11 | Aula 10 — DNS reverso e consultas |
+| 05/11 | Conferência da integração DHCP/DNS, HTTP básico e introdução ao Nginx — aulas 11, 12 e início da 13 |
 | 10 e 12/11 | Eventos prováveis; sem conteúdo novo previsto |
-| 17/11 | Aulas 12 e 13 — HTTP básico e Nginx |
+| 17/11 | Continuação da aula 13 — virtual host, acesso por nome, logs e diagnóstico |
 | 19/11 | Sem aula |
 | 24/11 | Aula 14 — laboratório integrado e revisão |
 | 26/11 | Aula 15 — Avaliação 1 |
 
-Os números identificam os blocos de conteúdo. Dois tutoriais podem ser utilizados no mesmo encontro. Os eventos são contabilizados como encontros, sem acrescentar conteúdo aos tutoriais. As aulas 1 a 8 já foram utilizadas e testadas.
+Os números identificam os blocos de conteúdo. Dois tutoriais podem ser utilizados no mesmo encontro. Os eventos são contabilizados como encontros, sem acrescentar conteúdo aos tutoriais. As aulas 1 a 9 já foram utilizadas e testadas. A aula 8 ocorreu em 27/10/2026 e a aula 9 em 29/10/2026; até a aula 9, tudo funcionou conforme relato do professor.
 
 ## Sobre as Aulas 01 a 04
 
