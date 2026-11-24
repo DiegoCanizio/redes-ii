@@ -1,79 +1,126 @@
 # Aula 16 — FTP com vsftpd
 
-## Objetivo
+## Objetivos
 
-Configurar FTP e observar:
+Ao final desta aula, você deverá conseguir:
 
-```text
-controle
-dados
-modo ativo
-modo passivo
-credenciais em texto claro
-```
+- explicar a diferença entre canal de controle e canal de dados no FTP;
+- configurar um servidor FTP com autenticação local;
+- realizar upload e download em modo passivo;
+- reconhecer a diferença entre modo ativo e passivo;
+- validar serviço, porta, autenticação, permissões e transferência;
+- utilizar logs e captura de pacotes como evidência;
+- diagnosticar um incidente sem receber um roteiro de correção.
 
-> Use somente a rede interna `REDES2`.
+A rede de laboratório continua sendo:
+
+~~~text
+servidor
+lab0: 192.168.50.10/24
+        │
+        │ FTP
+        ▼
+cliente
+lab0: endereço obtido por DHCP
+~~~
+
+> Use senhas temporárias de laboratório. Não reutilize credenciais pessoais, institucionais ou do GitHub.
 
 ---
 
-# Bloco 0
+## 1. Como o FTP funciona
 
-Servidor:
+O FTP utiliza mais de uma conexão.
 
-```bash
+~~~text
+cliente
+   │
+   │ TCP/21
+   ▼
+servidor FTP
+   │
+   └── canal de controle
+
+cliente ◄────────────► servidor
+        canal de dados
+~~~
+
+O canal TCP/21 transporta comandos como autenticação, mudança de diretório e solicitação de transferência.
+
+A transferência de dados utiliza outra conexão.
+
+No modo passivo, o servidor informa uma porta de dados e o cliente inicia a conexão até ela.
+
+No modo ativo, o cliente informa onde receberá a conexão de dados e o servidor inicia essa segunda conexão.
+
+---
+
+## 2. Instale as ferramentas
+
+No servidor:
+
+~~~bash
 sudo apt update
 sudo apt install -y vsftpd tcpdump
-```
+~~~
 
-Cliente:
+No cliente:
 
-```bash
+~~~bash
 sudo apt update
-sudo apt install -y lftp tcpdump git gh
-```
+sudo apt install -y lftp tcpdump
+~~~
 
-Prepare seu portfólio.
+No servidor, observe inicialmente:
+
+~~~bash
+systemctl status vsftpd --no-pager
+sudo ss -lntp | grep ':21'
+~~~
 
 ---
 
-# Parte 1 — Crie um usuário de laboratório
+## 3. Crie um usuário de laboratório
 
-Servidor:
+No servidor:
 
-```bash
+~~~bash
 sudo adduser ftpuser
-```
+~~~
 
-Crie uma senha **temporária exclusiva desta aula**.
+Defina uma senha temporária.
 
-Não reutilize senha pessoal, do GitHub ou institucional.
+Crie um arquivo que será baixado posteriormente:
 
-Crie:
+~~~bash
+sudo -u ftpuser bash -c   'echo "Arquivo disponibilizado pelo servidor FTP" > /home/ftpuser/servidor.txt'
+~~~
 
-```bash
-sudo -u ftpuser bash -c \
-  'echo "Arquivo do servidor FTP" > /home/ftpuser/servidor.txt'
-```
+Confira:
+
+~~~bash
+sudo -u ftpuser ls -l /home/ftpuser
+~~~
 
 ---
 
-# Parte 2 — Configure vsftpd
+## 4. Configure o vsftpd
 
-Backup:
+Faça backup:
 
-```bash
+~~~bash
 sudo cp /etc/vsftpd.conf /etc/vsftpd.conf.original
-```
+~~~
 
 Edite:
 
-```bash
+~~~bash
 sudo nano /etc/vsftpd.conf
-```
+~~~
 
-Use:
+Utilize como configuração de laboratório:
 
-```conf
+~~~conf
 listen=YES
 listen_ipv6=NO
 
@@ -87,211 +134,291 @@ allow_writeable_chroot=YES
 pasv_enable=YES
 pasv_min_port=40000
 pasv_max_port=40010
-```
+~~~
 
 Reinicie:
 
-```bash
+~~~bash
 sudo systemctl restart vsftpd
-```
+~~~
 
 Verifique:
 
-```bash
-systemctl status vsftpd --no-pager
-ss -lntp | grep ':21'
-```
+~~~bash
+systemctl is-active vsftpd
+sudo ss -lntp | grep ':21'
+sudo journalctl -u vsftpd -n 20 --no-pager
+~~~
+
+Diferentemente de Kea, BIND e Nginx, o vsftpd não fornece no nosso fluxo um validador prévio equivalente aos comandos usados anteriormente. Por isso, após a alteração, o estado do serviço e o journal tornam-se especialmente importantes.
 
 ---
 
-# Parte 3 — Transferência em modo passivo
+## 5. Faça a primeira conexão
 
-Cliente:
+No cliente:
 
-```bash
-echo "Arquivo enviado pelo cliente" > arquivo-cliente.txt
-```
+~~~bash
+echo "Arquivo criado no cliente" > arquivo-cliente.txt
+~~~
 
 Conecte:
 
-```bash
+~~~bash
 lftp -u ftpuser ftp://192.168.50.10
-```
+~~~
 
-Informe a senha quando solicitado.
+Informe a senha temporária.
 
-Dentro do `lftp`:
+Dentro do lftp:
 
-```text
+~~~text
+pwd
 ls
 get servidor.txt
 put arquivo-cliente.txt
+ls
 bye
-```
+~~~
 
-Confira os arquivos.
+No cliente:
+
+~~~bash
+ls -l servidor.txt
+cat servidor.txt
+~~~
+
+No servidor:
+
+~~~bash
+sudo -u ftpuser ls -l /home/ftpuser
+~~~
+
+Você deve conseguir demonstrar:
+
+~~~text
+autenticação
++
+listagem
++
+download
++
+upload
+~~~
 
 ---
 
-# Parte 4 — Modo ativo
+## 6. Observe o modo passivo
 
-Conecte novamente.
+Abra novamente o lftp:
 
-Dentro do `lftp`:
+~~~bash
+lftp -u ftpuser ftp://192.168.50.10
+~~~
 
-```text
+Dentro da sessão:
+
+~~~text
+set ftp:passive-mode true
+debug 3
+ls
+~~~
+
+Observe que a sessão de controle permanece em TCP/21, enquanto uma segunda conexão é criada para os dados.
+
+No servidor, em outro terminal:
+
+~~~bash
+sudo tcpdump -ni lab0   'tcp port 21 or portrange 40000-40010'
+~~~
+
+Faça uma transferência e associe os pacotes às duas funções.
+
+---
+
+## 7. Compare com o modo ativo
+
+No lftp:
+
+~~~text
 set ftp:passive-mode false
 ls
-```
+~~~
 
-Depois:
+Depois retorne:
 
-```text
+~~~text
 set ftp:passive-mode true
-```
+~~~
 
-Complete:
+Registre em seu portfólio a diferença observada.
 
-```text
-Modo passivo:
-____________________________________________________________
-
-Modo ativo:
-____________________________________________________________
-```
+Não é necessário decorar comandos internos de FTP. O importante é compreender quem inicia a conexão de dados em cada modo.
 
 ---
 
-# Parte 5 — Capture o canal de controle
+## 8. Observe o canal de controle
 
-Servidor:
+No servidor:
 
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A 'tcp port 21'
-```
+~~~bash
+sudo tcpdump -ni lab0 -nn -A 'tcp port 21'
+~~~
 
-No cliente, faça novo login.
+No cliente, faça uma nova autenticação usando somente a senha temporária.
 
-Procure:
+Observe comandos do protocolo, inclusive USER e PASS.
 
-```text
-USER
-PASS
-```
+Responda no portfólio:
 
-Pergunta:
-
-### A credencial ficou protegida por criptografia?
-
-```text
-☐ Sim
-☐ Não
-```
+- a autenticação FTP deste laboratório está protegida por criptografia?
+- o conteúdo do canal de controle pode ser observado?
+- por que não devemos reutilizar uma senha real neste experimento?
 
 ---
 
-# Parte 6 — Observe portas passivas
+## 9. Ferramentas de diagnóstico e validação
 
-Servidor:
+### Serviço
 
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn \
-  'tcp port 21 or portrange 40000-40010'
-```
+~~~bash
+systemctl status vsftpd --no-pager
+systemctl is-active vsftpd
+~~~
 
-No cliente, faça uma transferência.
+Pergunta respondida: o processo do serviço está ativo?
 
-Procure conexão:
+### Porta
 
-```text
-TCP/21
-```
+~~~bash
+sudo ss -lntp | grep ':21'
+~~~
 
-e uma porta:
+Pergunta respondida: existe processo escutando em TCP/21?
 
-```text
-40000–40010
-```
+### Logs
+
+~~~bash
+sudo journalctl -u vsftpd -n 50 --no-pager
+~~~
+
+Pergunta respondida: o serviço registrou erro de inicialização, autenticação ou sessão?
+
+### Cliente com depuração
+
+~~~bash
+lftp -d -u ftpuser ftp://192.168.50.10
+~~~
+
+Pergunta respondida: em qual etapa a sessão FTP está falhando?
+
+### Sistema de arquivos
+
+~~~bash
+id ftpuser
+ls -ld /home/ftpuser
+ls -l /home/ftpuser
+~~~
+
+Pergunta respondida: o usuário possui permissões compatíveis com a operação solicitada?
+
+### Tráfego
+
+~~~bash
+sudo tcpdump -ni lab0   'tcp port 21 or portrange 40000-40010'
+~~~
+
+Pergunta respondida: a conexão chegou ao servidor e houve tentativa de estabelecer o canal de dados?
 
 ---
 
-# Parte 7 — Incidente
+## 10. Troubleshooting
 
-O professor introduzirá uma restrição de escrita.
+O professor introduzirá uma falha no ambiente.
 
-Teste:
+Você receberá apenas o sintoma e o estado final esperado.
 
-```text
-login
-listagem
-download
-upload
-```
+Exemplo de sintoma possível:
 
-Registre:
+~~~text
+O usuário consegue autenticar.
+A listagem funciona.
+O download funciona.
+O upload falha.
+~~~
 
-```text
-O que continuou funcionando?
-____________________________________________________________
+Não altere várias configurações ao mesmo tempo.
 
-O que falhou?
-____________________________________________________________
+Utilize o método:
 
-Evidência:
-____________________________________________________________
-```
+~~~text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+~~~
+
+As ferramentas ensinadas nesta aula e nas aulas anteriores estão disponíveis, mas a escolha da sequência de testes faz parte do exercício.
 
 ---
 
-# Parte 8 — Portfólio
+## 11. Portfólio
 
-```text
+Organize:
+
+~~~text
 transferencia/aula-16/
 ├── README.md
 └── vsftpd.conf
-```
+~~~
 
-README:
+Copie a configuração sem incluir senhas:
 
-```markdown
+~~~bash
+sudo cp /etc/vsftpd.conf ~/vsftpd-aula16.conf
+~~~
+
+Leve o arquivo ao seu portfólio conforme o fluxo já utilizado na disciplina.
+
+O README deve conter:
+
+~~~markdown
 # Aula 16 — FTP
 
-## Serviço
-- endereço:
+## Arquitetura
+- canal de controle:
+- canal de dados:
+- modo passivo:
+- modo ativo:
+
+## Configuração
+- endereço do servidor:
 - porta de controle:
+- faixa passiva:
 
-## Modos
-### Passivo
-### Ativo
-
-## Transferências
+## Validação
+- serviço:
+- porta:
+- autenticação:
+- upload:
+- download:
 
 ## Captura
-Quais informações apareceram em texto claro?
+O que foi observado no canal de controle?
 
-## Segurança
-Por que uma senha real não deve ser reutilizada neste experimento?
-
-## Incidente
+## Troubleshooting
 ### Sintoma
-### Evidência
+### Hipótese
+### Testes e evidências
 ### Causa
 ### Correção
-```
+### Validação
 
-**Não inclua a senha no README.**
+## Síntese
+Explique por que verificar apenas a porta 21 não é suficiente para validar completamente uma transferência FTP.
+~~~
 
-Versione:
-
-```bash
-git add transferencia/aula-16
-git commit -m "Aula 16 - configura e analisa FTP"
-git push
-gh auth logout
-```
-
----
-
-# Próxima aula
-
-SFTP e SCP sobre SSH.
+Versione somente arquivos apropriados. Não registre senhas.
