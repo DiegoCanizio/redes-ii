@@ -1,173 +1,32 @@
-# Avaliação Prática Final — Redes de Computadores II
+# Aula 30 — Avaliação 2
 
-## Missão
+## Objetivo
 
-Sua equipe receberá:
+A Avaliação 2 verificará as competências construídas ao longo do segundo bloco da disciplina.
 
-```text
-VMs limpas
-```
+O ambiente, a composição da nota, os critérios e as regras específicas serão fornecidos pelo professor separadamente.
 
-e deverá reconstruir a infraestrutura preparada na Aula 29.
+## Conteúdos e competências possíveis
 
-A fonte de verdade é o repositório e a documentação produzida pela equipe.
+A avaliação poderá envolver:
 
----
+- FTP e transferência de arquivos;
+- SMTP e Postfix;
+- DNS aplicado ao correio eletrônico;
+- POP3 e IMAP4 com Dovecot;
+- integração do sistema de e-mail;
+- TLS aplicado ao correio;
+- firewall com nftables;
+- proxy e filtragem de conteúdo;
+- análise de pacotes com tcpdump;
+- integração entre serviços;
+- diagnóstico e validação técnica.
 
-# Etapas
+## Método de diagnóstico
 
-Você deverá:
+Quando houver incidentes:
 
-```text
-1. reconstruir
-2. demonstrar
-3. integrar
-4. atender uma mudança
-5. diagnosticar um incidente
-6. registrar a entrega
-```
-
----
-
-# Serviços esperados
-
-```text
-DHCP
-DNS
-HTTP/HTTPS
-SSH/SFTP
-nftables
-SNMP
-Docker Compose
-```
-
-Mais o serviço adicional definido no projeto:
-
-```text
-FTP
-ou
-SMTP + IMAP
-```
-
----
-
-# Etapa 1 — Reconstrução
-
-Parta das VMs limpas.
-
-Utilize seu repositório para recuperar:
-
-```text
-configurações
-documentação
-scripts
-compose
-arquivos de serviço
-```
-
-Faça as validações estudadas antes de reiniciar/recarregar serviços.
-
----
-
-# Etapa 2 — Aceite
-
-Esteja preparado para demonstrar:
-
-## Rede
-
-```text
-[ ] endereço
-[ ] rota
-[ ] conectividade
-```
-
-## DHCP
-
-```text
-[ ] lease
-[ ] reserva
-[ ] DNS entregue
-```
-
-## DNS
-
-```text
-[ ] resolução direta
-[ ] resolução reversa
-```
-
-## Web
-
-```text
-[ ] HTTP
-[ ] HTTPS
-```
-
-## SSH/SFTP
-
-```text
-[ ] acesso
-[ ] transferência
-```
-
-## Firewall
-
-```text
-[ ] serviço permitido
-[ ] porta não permitida bloqueada
-```
-
-## SNMP
-
-```text
-[ ] consulta
-[ ] contador/métrica
-```
-
-## Docker Compose
-
-```text
-[ ] containers
-[ ] serviço
-```
-
-## Serviço adicional
-
-```text
-[ ] funcional
-```
-
----
-
-# Etapa 3 — Mudança
-
-O professor fornecerá uma pequena alteração.
-
-Registre:
-
-```text
-Requisito:
-____________________________________________________________
-
-Arquivo/configuração alterado:
-____________________________________________________________
-
-Validação antes da aplicação:
-____________________________________________________________
-
-Teste final:
-____________________________________________________________
-```
-
----
-
-# Etapa 4 — Incidente
-
-O professor introduzirá um incidente.
-
-Utilize:
-
-```text
+~~~text
 Sintoma
 → Hipótese
 → Teste
@@ -175,108 +34,12 @@ Sintoma
 → Causa
 → Correção
 → Validação
-```
+~~~
 
-## Sintoma
+## Importante
 
-____________________________________________________________________
+A avaliação não será um novo tutorial.
 
-## Hipótese
+O aluno deverá interpretar o ambiente, selecionar ferramentas adequadas, produzir evidências, corrigir as causas identificadas e validar o estado final solicitado.
 
-____________________________________________________________________
-
-## Testes
-
-____________________________________________________________________
-
-## Evidências
-
-____________________________________________________________________
-
-## Causa
-
-____________________________________________________________________
-
-## Correção
-
-____________________________________________________________________
-
-## Validação
-
-____________________________________________________________________
-
----
-
-# Rubrica
-
-| Critério | Pontos |
-|---|---:|
-| Reconstrução a partir do repositório | 20 |
-| Funcionalidade dos serviços | 25 |
-| Integração entre serviços | 15 |
-| Firewall e segurança operacional | 10 |
-| Alteração solicitada | 10 |
-| Troubleshooting | 15 |
-| Documentação final | 5 |
-| **Total** | **100** |
-
----
-
-# Entrega final
-
-Atualize:
-
-```text
-projeto-final/README.md
-```
-
-com:
-
-```markdown
-# Projeto Final — Redes II
-
-## Arquitetura
-
-## Endereçamento
-
-## Serviços e portas
-
-## Ordem de reconstrução
-
-## Testes de aceite
-
-## Alteração solicitada
-
-## Incidente
-### Sintoma
-### Hipótese
-### Testes
-### Evidências
-### Causa
-### Correção
-### Validação
-
-## Segurança
-
-## Limitações conhecidas
-```
-
-Faça o commit/push final e encerre a autenticação.
-
----
-
-# Síntese da disciplina
-
-Ao concluir, você deve ser capaz de:
-
-```text
-implantar
-configurar
-testar
-proteger
-monitorar
-diagnosticar
-reconstruir
-```
-
-serviços reais de rede.
+As orientações específicas serão mantidas separadas deste tutorial para que o material não dependa de data, duração ou formato de aplicação.
