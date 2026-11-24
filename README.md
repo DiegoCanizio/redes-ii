@@ -28,16 +28,15 @@ Ao longo da disciplina, serão trabalhados serviços e tecnologias relacionados 
 - captura e análise de tráfego;
 - DHCP;
 - DNS;
-- HTTP e HTTPS;
-- FTP, SFTP e SCP;
-- SMTP, POP3 e IMAP;
-- TLS e certificados;
+- HTTP e Nginx;
+- FTP;
+- SMTP, POP3 e IMAP4;
+- DNS aplicado ao correio eletrônico;
+- TLS aplicado aos serviços de correio;
 - firewall com `nftables`;
 - proxy e filtragem de conteúdo;
-- monitoramento e gerenciamento de redes;
-- SNMP;
-- Docker e Docker Compose;
-- integração e reconstrução de serviços.
+- captura e análise de tráfego com `tcpdump`;
+- integração, comissionamento e troubleshooting de serviços.
 
 A disciplina possui forte componente prático. O objetivo não é apenas executar comandos, mas compreender **o que está acontecendo, como verificar se funcionou e como diagnosticar quando não funcionar**.
 
@@ -70,17 +69,36 @@ Cada tutorial pode conter:
 - evidências a serem produzidas;
 - atividades de consolidação.
 
-Nas primeiras aulas, os roteiros serão mais detalhados e guiados. Ao longo do semestre, a quantidade de instruções será reduzida progressivamente, exigindo maior autonomia na configuração e no diagnóstico.
+Os roteiros apresentam explicitamente os conceitos, a implantação, as ferramentas de diagnóstico e os procedimentos de validação. A autonomia aumenta principalmente nas atividades de troubleshooting: o estudante recebe o sintoma e o estado esperado, mas deve selecionar as ferramentas, interpretar evidências, localizar a causa, corrigir e validar.
 
 ---
 
 ## Ambiente de laboratório
 
-As atividades utilizam **máquinas virtuais Ubuntu Server**.
+As atividades utilizam ambientes Linux persistentes e isolados, com uma máquina lógica de servidor e uma de cliente para cada estudante.
 
-Como os computadores do laboratório podem ser restaurados entre os encontros, as VMs devem ser tratadas como ambientes **descartáveis**.
+A topologia didática principal é:
 
-A filosofia de trabalho da disciplina é:
+```text
+PC do estudante
+      │
+      │ SSH
+      ▼
+srv-r2-sNN
+    ├── host0 → gerenciamento
+    └── lab0
+          │
+          │ rede isolada
+          ▼
+      cli-r2-sNN
+          └── lab0
+```
+
+A interface `host0` é utilizada para gerenciamento e não deve ser alterada sem orientação.
+
+A interface `lab0` é utilizada nos experimentos da disciplina. Como cada laboratório é isolado, todos os estudantes podem reutilizar o mesmo endereçamento interno.
+
+A filosofia de trabalho da disciplina permanece:
 
 ```text
 manual
@@ -92,32 +110,9 @@ versionado
 scriptado
   ↓
 automatizado
-  ↓
-containerizado
 ```
 
-Ou, de forma mais direta:
-
-> **Não precisamos preservar a máquina. Precisamos ser capazes de reconstruí-la.**
-
-A topologia básica utilizada ao longo da disciplina será composta por duas VMs:
-
-```text
-                         INTERNET
-                            │
-                           NAT
-                    ┌───────┴───────┐
-                    │               │
-             ┌──────┴──────┐ ┌──────┴──────┐
-             │  cli-redes2 │ │ srv-redes2  │
-             │   Cliente   │ │  Servidor   │
-             └──────┬──────┘ └──────┬──────┘
-                    │               │
-                    └──── REDES2 ───┘
-                       rede interna
-```
-
-A interface NAT será utilizada principalmente para acesso externo e instalação de pacotes. A rede interna `REDES2` será utilizada nos experimentos da disciplina.
+> **Mais importante do que preservar uma configuração é ser capaz de compreendê-la, validá-la e reconstruí-la quando necessário.**
 
 ---
 
