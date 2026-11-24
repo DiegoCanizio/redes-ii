@@ -1,342 +1,166 @@
-# Aula 18 — SMTP, DNS e registros MX
+# Aula 18 — SMTP por dentro e primeira configuração do Postfix
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- explicar o papel do registro MX;
-- diferenciar resolução do servidor de correio e transporte SMTP;
-- publicar a identidade mail.empresa.test no DNS;
-- criar e validar um registro MX para empresa.test;
-- testar DNS e SMTP separadamente;
-- utilizar fila e logs para localizar uma falha de entrega;
-- diagnosticar uma inconsistência entre DNS e correio eletrônico.
+- explicar o papel do SMTP;
+- diferenciar MUA, MTA e armazenamento da caixa postal;
+- instalar e configurar um Postfix para entrega local;
+- realizar uma sessão SMTP manual;
+- interpretar respostas básicas do protocolo;
+- confirmar a entrega em Maildir;
+- utilizar serviço, porta, fila e logs no diagnóstico.
 
-O Postfix configurado anteriormente continuará sendo utilizado.
-
----
-
-## 1. Fluxo que será construído
+## 1. Arquitetura inicial
 
 ~~~text
-destinatário: bob@empresa.test
-             │
-             ▼
-        consulta MX
-             │
-             ▼
-empresa.test MX mail.empresa.test
-             │
-             ▼
-mail.empresa.test → 192.168.50.10
-             │
-             ▼
-          TCP/25
-             │
-             ▼
-           Postfix
+cliente
+  │
+  │ SMTP / TCP 25
+  ▼
+Postfix
+  │
+  ▼
+Maildir do destinatário
 ~~~
 
-O DNS não transporta a mensagem.
-
-O DNS informa qual host deve receber correio para um domínio.
-
----
-
-## 2. Verifique o estado inicial
+## 2. Instale as ferramentas
 
 Servidor:
 
 ~~~bash
-ip -4 -br addr show lab0
-systemctl is-active bind9
-systemctl is-active postfix
-sudo ss -lntup | grep -E ':(25|53)'
+sudo apt update
+sudo DEBIAN_FRONTEND=noninteractive apt install -y postfix
 ~~~
 
 Cliente:
 
 ~~~bash
-resolvectl status lab0
-dig empresa.test
+sudo apt update
+sudo apt install -y netcat-openbsd
 ~~~
 
----
-
-## 3. Adicione o servidor de correio à zona direta
-
-No servidor DNS, edite a zona empresa.test utilizada nas aulas anteriores.
-
-Adicione:
-
-~~~dns
-mail    IN  A   192.168.50.10
-@       IN  MX  10 mail.empresa.test.
-~~~
-
-Atualize o serial da zona conforme o padrão já utilizado na disciplina.
-
----
-
-## 4. Valide o DNS antes de recarregar
-
-Primeiro:
+## 3. Crie usuários e Maildir
 
 ~~~bash
-sudo named-checkconf
+sudo adduser alice
+sudo adduser bob
+sudo -u alice mkdir -p /home/alice/Maildir/{cur,new,tmp}
+sudo -u bob mkdir -p /home/bob/Maildir/{cur,new,tmp}
 ~~~
 
-Depois valide a zona:
+Use senhas temporárias.
+
+## 4. Configure o Postfix
 
 ~~~bash
-sudo named-checkzone empresa.test /etc/bind/db.empresa.test
+sudo postconf -e 'myhostname = mail.empresa.test'
+sudo postconf -e 'mydomain = empresa.test'
+sudo postconf -e 'myorigin = $mydomain'
+sudo postconf -e 'inet_interfaces = all'
+sudo postconf -e 'inet_protocols = ipv4'
+sudo postconf -e 'mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain'
+sudo postconf -e 'mynetworks = 127.0.0.0/8, 192.168.50.0/24'
+sudo postconf -e 'home_mailbox = Maildir/'
 ~~~
 
-Use o caminho real da zona caso seu arquivo tenha outro nome.
-
-Somente após a validação:
+Observe:
 
 ~~~bash
-sudo systemctl reload bind9
+postconf -n
 ~~~
 
----
+## 5. Valide antes de reiniciar
 
-## 5. Consulte o MX
+~~~bash
+sudo postfix check
+sudo systemctl restart postfix
+systemctl is-active postfix
+sudo ss -lntp | grep ':25'
+~~~
+
+## 6. Faça uma sessão SMTP manual
 
 No cliente:
-
-~~~bash
-dig empresa.test MX
-~~~
-
-Depois:
-
-~~~bash
-dig mail.empresa.test A
-~~~
-
-Para obter somente a resposta:
-
-~~~bash
-dig +short empresa.test MX
-dig +short mail.empresa.test A
-~~~
-
-O resultado esperado é equivalente a:
-
-~~~text
-10 mail.empresa.test.
-192.168.50.10
-~~~
-
----
-
-## 6. Separe DNS de SMTP
-
-Primeiro valide apenas o DNS:
-
-~~~bash
-dig mail.empresa.test
-~~~
-
-Depois valide apenas a conectividade SMTP usando o endereço:
 
 ~~~bash
 nc 192.168.50.10 25
 ~~~
 
-Encerre com:
-
-~~~text
-QUIT
-~~~
-
-Finalmente valide a integração nome + serviço:
-
-~~~bash
-nc mail.empresa.test 25
-~~~
-
-Esse raciocínio é importante:
-
-~~~text
-dig falha
-→ investigar DNS
-
-dig funciona + TCP/25 falha
-→ investigar rede/porta/serviço
-
-dig funciona + TCP/25 responde
-→ avançar para comportamento SMTP
-~~~
-
----
-
-## 7. Envie usando o nome
-
-No cliente:
-
-~~~bash
-nc mail.empresa.test 25
-~~~
-
-Use:
+Digite:
 
 ~~~text
 EHLO cli.empresa.test
 MAIL FROM:<alice@empresa.test>
 RCPT TO:<bob@empresa.test>
 DATA
-Subject: DNS e SMTP integrados
+Subject: Primeiro teste SMTP
+From: alice@empresa.test
+To: bob@empresa.test
 
-Mensagem entregue utilizando o nome do servidor de correio.
+Mensagem enviada manualmente.
 .
 QUIT
 ~~~
 
-No servidor:
+Respostas comuns:
 
-~~~bash
-sudo find /home/bob/Maildir/new -maxdepth 1 -type f
+~~~text
+220 serviço pronto
+250 operação aceita
+354 aguardando conteúdo
+221 encerramento
 ~~~
 
----
-
-## 8. Observe como domínios públicos anunciam correio
-
-No cliente:
+## 7. Confirme a entrega
 
 ~~~bash
-dig gmail.com MX
+sudo find /home/bob/Maildir/new -maxdepth 1 -type f -printf '%f\n'
 ~~~
 
-ou outro domínio indicado pelo professor.
+Leia uma mensagem indicada pelo professor.
 
-Compare a existência de vários servidores e prioridades.
-
-Não tentaremos enviar mensagens para a Internet nesta aula.
-
----
-
-## 9. Ferramentas de diagnóstico e validação
-
-### Configuração do BIND
-
-~~~bash
-sudo named-checkconf
-~~~
-
-### Zona
-
-~~~bash
-sudo named-checkzone empresa.test /etc/bind/db.empresa.test
-~~~
-
-### Consultas
-
-~~~bash
-dig empresa.test MX
-dig mail.empresa.test A
-~~~
-
-### Resolução utilizada pelo cliente
-
-~~~bash
-resolvectl status lab0
-getent hosts mail.empresa.test
-~~~
-
-### Serviço SMTP
-
-~~~bash
-systemctl is-active postfix
-sudo ss -lntp | grep ':25'
-~~~
-
-### Configuração do Postfix
-
-~~~bash
-postconf myhostname
-postconf mydomain
-postconf mydestination
-~~~
-
-### Fila e logs
+## 8. Fila e logs
 
 ~~~bash
 postqueue -p
 sudo journalctl -u postfix -n 60 --no-pager
 ~~~
 
-Cada ferramenta responde a uma pergunta diferente. Não trate falha de nome, falha de porta e rejeição SMTP como o mesmo problema.
+## 9. Ferramentas de diagnóstico e validação
 
----
+~~~bash
+postconf -n
+sudo postfix check
+systemctl is-active postfix
+sudo ss -lntp | grep ':25'
+nc 192.168.50.10 25
+postqueue -p
+sudo journalctl -u postfix -n 60 --no-pager
+sudo find /home/bob/Maildir -maxdepth 2 -type f
+~~~
 
 ## 10. Troubleshooting
 
-O professor introduzirá uma inconsistência relacionada à integração DNS + SMTP.
-
-O sintoma poderá ser semelhante a:
+Exemplo:
 
 ~~~text
-O Postfix está ativo.
-A porta 25 está aberta.
-O cliente não consegue utilizar corretamente mail.empresa.test
-para concluir a operação esperada.
+TCP/25 responde.
+O remetente é aceito.
+O destinatário local é rejeitado.
 ~~~
 
-Ou:
-
-~~~text
-O nome resolve, mas a mensagem para o domínio não segue o comportamento esperado.
-~~~
-
-Você deve localizar a camada responsável usando evidências.
-
-Não será fornecida sequência de comandos.
-
----
+O aluno deve localizar a causa usando evidências.
 
 ## 11. Portfólio
-
-Organize:
 
 ~~~text
 email/aula-18/
 ├── README.md
-└── zona-empresa.test.txt
+└── postfix-parametros.txt
 ~~~
 
-O README deve conter:
-
-~~~markdown
-# Aula 18 — DNS e MX
-
-## Registros
-- A de mail:
-- MX:
-- prioridade:
-
-## Fluxo
-Explique como bob@empresa.test leva à descoberta de mail.empresa.test.
-
-## Validações
-- named-checkconf:
-- named-checkzone:
-- dig MX:
-- dig A:
-- TCP/25:
-- entrega:
-
-## Troubleshooting
-### Sintoma
-### Hipótese
-### Testes e evidências
-### Causa
-### Correção
-### Validação
-
-## Síntese
-Explique por que um MX correto não garante que o SMTP esteja funcionando.
-~~~
+Gere postfix-parametros.txt com postconf -n e documente sessão, fila, logs e troubleshooting.
