@@ -1,160 +1,140 @@
-# Aula 22 — Firewall com nftables
+# Aula 22 — TLS aplicado ao correio eletrônico
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- explicar o papel de um firewall no host;
-- identificar quais serviços precisam ser acessíveis;
-- criar uma política básica com nftables;
-- permitir conexões estabelecidas;
-- liberar serviços explicitamente;
-- validar regras e observar o ruleset;
-- distinguir falha de serviço de bloqueio por firewall;
-- diagnosticar um incidente de filtragem.
+- explicar por que as credenciais observadas anteriormente precisam de proteção;
+- gerar um certificado de laboratório;
+- configurar TLS no Postfix e no Dovecot;
+- validar SMTP com STARTTLS;
+- validar IMAPS e POP3S;
+- utilizar `openssl s_client` para observar a negociação TLS;
+- diagnosticar falhas básicas de certificado, porta e configuração.
 
-## 1. Antes do firewall
+O foco é TLS aplicado aos serviços de correio, não um módulo isolado de segurança.
 
-~~~bash
-sudo ss -lntup
-~~~
-
-Relacione porta e serviço:
+## 1. Do texto claro ao TLS
 
 ~~~text
-22 SSH
-25 SMTP
-53 DNS
-80 HTTP
-110 POP3
-143 IMAP
-993 IMAPS
-995 POP3S
+SMTP 25  → STARTTLS
+IMAP 143 → IMAPS 993
+POP3 110 → POP3S 995
 ~~~
 
-## 2. Instale
+## 2. Gere um certificado
 
 ~~~bash
-sudo apt update
-sudo apt install -y nftables
-sudo nft list ruleset
+sudo openssl req -x509 -newkey rsa:2048 -nodes   -keyout /etc/ssl/private/mail.empresa.test.key   -out /etc/ssl/certs/mail.empresa.test.crt   -days 30   -subj "/CN=mail.empresa.test"   -addext "subjectAltName=DNS:mail.empresa.test"
+
+sudo chmod 600 /etc/ssl/private/mail.empresa.test.key
 ~~~
 
-## 3. Política inicial
-
-Backup:
+Observe:
 
 ~~~bash
-sudo cp /etc/nftables.conf /etc/nftables.conf.original
+openssl x509 -in /etc/ssl/certs/mail.empresa.test.crt   -noout -subject -issuer -dates -ext subjectAltName
 ~~~
 
-Use uma estrutura de laboratório:
-
-~~~nft
-#!/usr/sbin/nft -f
-
-flush ruleset
-
-table inet filter {
-    chain input {
-        type filter hook input priority 0;
-        policy drop;
-
-        iif "lo" accept
-        ct state established,related accept
-        ip protocol icmp accept
-        tcp dport 22 accept
-    }
-
-    chain forward {
-        type filter hook forward priority 0;
-        policy drop;
-    }
-
-    chain output {
-        type filter hook output priority 0;
-        policy accept;
-    }
-}
-~~~
-
-## 4. Valide antes de aplicar
+## 3. Configure Postfix
 
 ~~~bash
-sudo nft -c -f /etc/nftables.conf
-sudo systemctl restart nftables
-sudo nft list ruleset
+sudo postconf -e 'smtpd_tls_cert_file = /etc/ssl/certs/mail.empresa.test.crt'
+sudo postconf -e 'smtpd_tls_key_file = /etc/ssl/private/mail.empresa.test.key'
+sudo postconf -e 'smtpd_tls_security_level = may'
+sudo postfix check
+sudo systemctl restart postfix
 ~~~
 
-## 5. Libere serviços necessários
+## 4. Configure Dovecot
 
-Conforme o cenário, acrescente regras como:
+Em `/etc/dovecot/conf.d/10-ssl.conf`:
 
-~~~nft
-tcp dport 25 accept
-udp dport 53 accept
-tcp dport 53 accept
-tcp dport 80 accept
-tcp dport 110 accept
-tcp dport 143 accept
-tcp dport 993 accept
-tcp dport 995 accept
+~~~conf
+ssl = required
+ssl_cert = </etc/ssl/certs/mail.empresa.test.crt
+ssl_key = </etc/ssl/private/mail.empresa.test.key
 ~~~
 
-Valide novamente antes de reiniciar.
+Em `10-auth.conf`:
 
-## 6. Teste do cliente
+~~~conf
+disable_plaintext_auth = yes
+~~~
+
+Valide:
 
 ~~~bash
-dig @192.168.50.10 empresa.test
-curl -I http://192.168.50.10/
-nc -vz 192.168.50.10 25
-nc -vz 192.168.50.10 143
+sudo doveconf -n
+sudo systemctl restart dovecot
 ~~~
 
-Teste também uma porta que não deveria estar liberada.
-
-## 7. Ferramentas de diagnóstico e validação
+## 5. Verifique as portas
 
 ~~~bash
-sudo nft -c -f /etc/nftables.conf
-sudo nft -a list ruleset
-sudo ss -lntup
-systemctl is-active NOME_DO_SERVICO
-nc -vz 192.168.50.10 PORTA
-sudo tcpdump -ni lab0 port PORTA
+sudo ss -lntp | grep -E ':(25|993|995)\b'
 ~~~
 
-Separe:
+## 6. SMTP com STARTTLS
+
+~~~bash
+openssl s_client   -connect mail.empresa.test:25   -starttls smtp   -servername mail.empresa.test
+~~~
+
+## 7. IMAPS
+
+~~~bash
+openssl s_client   -connect mail.empresa.test:993   -servername mail.empresa.test
+~~~
+
+## 8. POP3S
+
+~~~bash
+openssl s_client   -connect mail.empresa.test:995   -servername mail.empresa.test
+~~~
+
+## 9. Confiança
 
 ~~~text
-serviço não escutando
-≠ pacote não chegando
-≠ firewall descartando
-≠ aplicação rejeitando
+TLS funcionando
+≠
+certificado confiável por uma CA pública
 ~~~
 
-## 8. Troubleshooting
+O certificado autoassinado permite o experimento, mas não estabelece confiança pública.
 
-O professor introduzirá uma regra incompatível com o estado esperado.
+## 10. Ferramentas de diagnóstico e validação
 
-Exemplo:
+~~~bash
+openssl x509 -in /etc/ssl/certs/mail.empresa.test.crt -noout -text
+postconf | grep tls
+sudo postfix check
+sudo journalctl -u postfix -n 60 --no-pager
+sudo doveconf -n | grep -E 'ssl|auth'
+sudo journalctl -u dovecot -n 60 --no-pager
+sudo ss -lntp
+openssl s_client -connect mail.empresa.test:993 -servername mail.empresa.test
+~~~
+
+## 11. Troubleshooting
+
+Possíveis sintomas:
 
 ~~~text
-DNS funciona.
-SMTP funciona.
-HTTP deixou de responder.
-O Nginx continua ativo.
+A porta está aberta, mas o handshake falha.
+O serviço apresenta certificado diferente do esperado.
+SMTP funciona, mas STARTTLS não é anunciado.
 ~~~
 
-O aluno deverá provar em qual camada está a falha.
+O aluno deverá localizar a causa usando evidências.
 
-## 9. Portfólio
+## 12. Portfólio
 
 ~~~text
-firewall/aula-22/
-├── README.md
-└── nftables.conf
+email/aula-22/
+└── README.md
 ~~~
 
-Registre política, serviços liberados, testes e troubleshooting.
+Não versione a chave privada.
