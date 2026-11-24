@@ -1,259 +1,149 @@
-# Aula 21 — TLS no e-mail
+# Aula 21 — TLS aplicado ao correio eletrônico
 
-## Objetivo
+## Objetivos
 
-Proteger:
+Ao final desta aula, você deverá conseguir:
 
-```text
-SMTP
-IMAP
-POP3
-```
+- explicar por que as credenciais observadas anteriormente precisam de proteção;
+- gerar um certificado de laboratório;
+- configurar TLS no Postfix;
+- configurar TLS no Dovecot;
+- validar SMTP com STARTTLS;
+- validar IMAPS e POP3S;
+- utilizar `openssl s_client` para observar a negociação TLS;
+- diagnosticar falhas básicas de certificado, porta e configuração.
 
-com TLS.
+O foco é TLS aplicado aos serviços já estudados, não um módulo separado de segurança.
 
----
+## 1. Situação anterior
 
-# Bloco 0
+~~~text
+SMTP  → STARTTLS
+IMAP  → IMAPS
+POP3  → POP3S
+~~~
 
-Reconstrua Postfix + Dovecot.
+## 2. Gere um certificado
 
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y postfix dovecot-core dovecot-imapd dovecot-pop3d openssl tcpdump
-```
-
-Cliente:
-
-```bash
-sudo apt update
-sudo apt install -y openssl git gh
-```
-
----
-
-# Parte 1 — Gere certificado
-
-Servidor:
-
-```bash
-sudo openssl req -x509 -newkey rsa:2048 -nodes \
-  -keyout /etc/ssl/private/mail.empresa.test.key \
-  -out /etc/ssl/certs/mail.empresa.test.crt \
-  -days 30 \
-  -subj "/CN=mail.empresa.test" \
-  -addext "subjectAltName=DNS:mail.empresa.test"
-```
-
-Proteja:
-
-```bash
+~~~bash
+sudo openssl req -x509 -newkey rsa:2048 -nodes   -keyout /etc/ssl/private/mail.empresa.test.key   -out /etc/ssl/certs/mail.empresa.test.crt   -days 30   -subj "/CN=mail.empresa.test"   -addext "subjectAltName=DNS:mail.empresa.test"
 sudo chmod 600 /etc/ssl/private/mail.empresa.test.key
-```
+~~~
 
----
+Observe:
 
-# Parte 2 — Postfix
+~~~bash
+openssl x509 -in /etc/ssl/certs/mail.empresa.test.crt   -noout -subject -issuer -dates -ext subjectAltName
+~~~
 
-```bash
-sudo postconf -e \
-  'smtpd_tls_cert_file = /etc/ssl/certs/mail.empresa.test.crt'
-```
+## 3. Configure o Postfix
 
-```bash
-sudo postconf -e \
-  'smtpd_tls_key_file = /etc/ssl/private/mail.empresa.test.key'
-```
-
-```bash
+~~~bash
+sudo postconf -e 'smtpd_tls_cert_file = /etc/ssl/certs/mail.empresa.test.crt'
+sudo postconf -e 'smtpd_tls_key_file = /etc/ssl/private/mail.empresa.test.key'
 sudo postconf -e 'smtpd_tls_security_level = may'
-```
-
-Valide:
-
-```bash
 sudo postfix check
 sudo systemctl restart postfix
-```
+~~~
 
----
+## 4. Configure o Dovecot
 
-# Parte 3 — Dovecot
+Em `/etc/dovecot/conf.d/10-ssl.conf`:
 
-Edite:
-
-```bash
-sudo nano /etc/dovecot/conf.d/10-ssl.conf
-```
-
-Use:
-
-```conf
+~~~conf
 ssl = required
 ssl_cert = </etc/ssl/certs/mail.empresa.test.crt
 ssl_key = </etc/ssl/private/mail.empresa.test.key
-```
+~~~
 
 Em `10-auth.conf`:
 
-```conf
+~~~conf
 disable_plaintext_auth = yes
-```
+~~~
 
 Valide:
 
-```bash
+~~~bash
 sudo doveconf -n
 sudo systemctl restart dovecot
-```
+~~~
 
----
+## 5. Verifique portas
 
-# Parte 4 — Verifique portas
+~~~bash
+sudo ss -lntp | grep -E ':(25|993|995)\b'
+~~~
 
-```bash
-ss -lntp | grep -E ':(25|993|995)\b'
-```
+## 6. SMTP com STARTTLS
 
----
-
-# Parte 5 — SMTP com STARTTLS
-
-Cliente:
-
-```bash
-openssl s_client \
-  -connect 192.168.50.10:25 \
-  -starttls smtp \
-  -servername mail.empresa.test
-```
+~~~bash
+openssl s_client   -connect mail.empresa.test:25   -starttls smtp   -servername mail.empresa.test
+~~~
 
 Após o handshake:
 
-```text
+~~~text
 EHLO cli.empresa.test
 QUIT
-```
+~~~
 
----
+## 7. IMAPS
 
-# Parte 6 — IMAPS
+~~~bash
+openssl s_client   -connect mail.empresa.test:993   -servername mail.empresa.test
+~~~
 
-```bash
-openssl s_client \
-  -connect 192.168.50.10:993 \
-  -servername mail.empresa.test
-```
+## 8. POP3S
 
-Depois:
+~~~bash
+openssl s_client   -connect mail.empresa.test:995   -servername mail.empresa.test
+~~~
 
-```text
-a1 LOGIN bob <SENHA-DE-LABORATORIO>
-a2 SELECT INBOX
-a3 LOGOUT
-```
+## 9. Confiança do certificado
 
----
+O certificado é autoassinado.
 
-# Parte 7 — POP3S
+~~~text
+TLS funcionando
+≠
+certificado confiável por uma CA pública
+~~~
 
-```bash
-openssl s_client \
-  -connect 192.168.50.10:995 \
-  -servername mail.empresa.test
-```
+## 10. Ferramentas de diagnóstico e validação
 
-Depois:
+~~~bash
+openssl x509 -in /etc/ssl/certs/mail.empresa.test.crt -noout -text
+postconf | grep tls
+sudo postfix check
+sudo journalctl -u postfix -n 60 --no-pager
+sudo doveconf -n | grep -E 'ssl|auth'
+sudo journalctl -u dovecot -n 60 --no-pager
+sudo ss -lntp | grep -E ':(25|993|995)\b'
+openssl s_client -connect mail.empresa.test:993 -servername mail.empresa.test
+~~~
 
-```text
-USER bob
-PASS <SENHA-DE-LABORATORIO>
-STAT
-QUIT
-```
+## 11. Troubleshooting
 
----
+O professor introduzirá uma inconsistência relacionada a TLS.
 
-# Parte 8 — Capture
+Possíveis sintomas:
 
-Servidor:
+~~~text
+A porta está aberta, mas o handshake falha.
+O serviço apresenta certificado diferente do esperado.
+SMTP funciona sem TLS, mas STARTTLS não é anunciado corretamente.
+~~~
 
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A \
-  'tcp port 25 or tcp port 993 or tcp port 995'
-```
+O aluno deve localizar a causa usando evidências.
 
-Pergunta:
+## 12. Portfólio
 
-### A senha apareceu em texto claro como na Aula 20?
-
-```text
-☐ Sim
-☐ Não
-```
-
-### O endereço IP e a porta ainda são observáveis?
-
-```text
-☐ Sim
-☐ Não
-```
-
----
-
-# Parte 9 — Portfólio
-
-```text
+~~~text
 email/aula-21/
-├── README.md
-├── mail.empresa.test.crt
-└── tls-parametros.txt
-```
+└── README.md
+~~~
 
-**Nunca copie a chave `.key`.**
+Inclua certificado, portas, evidências de STARTTLS/IMAPS/POP3S, confiança e troubleshooting.
 
-README:
-
-```markdown
-# Aula 21 — TLS no e-mail
-
-## Certificado
-- CN:
-- SAN:
-- validade:
-- autoassinado:
-
-## SMTP
-- STARTTLS:
-
-## IMAP
-- porta segura:
-
-## POP3
-- porta segura:
-
-## Captura
-O que ficou protegido?
-O que continuou observável?
-
-## Segurança
-Explique por que a chave privada não deve ser versionada.
-```
-
-Antes do commit:
-
-```bash
-git status
-```
-
-Confirme que nenhum `.key` aparece.
-
-Versione e encerre a autenticação.
-
----
-
-# Próxima aula
-
-Firewall com nftables.
+Não versione a chave privada.
