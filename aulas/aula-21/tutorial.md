@@ -1,149 +1,155 @@
-# Aula 21 — TLS aplicado ao correio eletrônico
+# Aula 21 — Sistema de e-mail integrado
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- explicar por que as credenciais observadas anteriormente precisam de proteção;
-- gerar um certificado de laboratório;
-- configurar TLS no Postfix;
-- configurar TLS no Dovecot;
-- validar SMTP com STARTTLS;
-- validar IMAPS e POP3S;
-- utilizar `openssl s_client` para observar a negociação TLS;
-- diagnosticar falhas básicas de certificado, porta e configuração.
+- integrar DNS, MX, SMTP, Maildir, IMAP e POP3;
+- explicar o caminho completo de uma mensagem;
+- validar cada camada separadamente;
+- distinguir falha de resolução, transporte, entrega local e acesso à caixa postal;
+- utilizar ferramentas de diagnóstico em sequência coerente;
+- diagnosticar um incidente integrado.
 
-O foco é TLS aplicado aos serviços já estudados, não um módulo separado de segurança.
-
-## 1. Situação anterior
+## 1. Arquitetura completa
 
 ~~~text
-SMTP  → STARTTLS
-IMAP  → IMAPS
-POP3  → POP3S
+cliente remetente
+      │
+      │ SMTP
+      ▼
+mail.empresa.test
+      │
+      ▼
+    Postfix
+      │
+      ▼
+Maildir do destinatário
+      ▲
+      │
+      ├── IMAP4
+      └── POP3
+      │
+cliente destinatário
+
+DNS:
+empresa.test MX 10 mail.empresa.test.
+mail.empresa.test A 192.168.50.10
 ~~~
 
-## 2. Gere um certificado
+## 2. Verifique os serviços
 
 ~~~bash
-sudo openssl req -x509 -newkey rsa:2048 -nodes   -keyout /etc/ssl/private/mail.empresa.test.key   -out /etc/ssl/certs/mail.empresa.test.crt   -days 30   -subj "/CN=mail.empresa.test"   -addext "subjectAltName=DNS:mail.empresa.test"
-sudo chmod 600 /etc/ssl/private/mail.empresa.test.key
+systemctl is-active bind9
+systemctl is-active postfix
+systemctl is-active dovecot
+sudo ss -lntup
 ~~~
 
-Observe:
+## 3. Valide DNS
 
 ~~~bash
-openssl x509 -in /etc/ssl/certs/mail.empresa.test.crt   -noout -subject -issuer -dates -ext subjectAltName
+dig empresa.test MX
+dig mail.empresa.test A
+getent hosts mail.empresa.test
 ~~~
 
-## 3. Configure o Postfix
+## 4. Valide SMTP e entrega
 
 ~~~bash
-sudo postconf -e 'smtpd_tls_cert_file = /etc/ssl/certs/mail.empresa.test.crt'
-sudo postconf -e 'smtpd_tls_key_file = /etc/ssl/private/mail.empresa.test.key'
-sudo postconf -e 'smtpd_tls_security_level = may'
-sudo postfix check
-sudo systemctl restart postfix
+nc mail.empresa.test 25
 ~~~
 
-## 4. Configure o Dovecot
+Envie uma mensagem para bob@empresa.test.
 
-Em `/etc/dovecot/conf.d/10-ssl.conf`:
-
-~~~conf
-ssl = required
-ssl_cert = </etc/ssl/certs/mail.empresa.test.crt
-ssl_key = </etc/ssl/private/mail.empresa.test.key
-~~~
-
-Em `10-auth.conf`:
-
-~~~conf
-disable_plaintext_auth = yes
-~~~
-
-Valide:
+No servidor:
 
 ~~~bash
-sudo doveconf -n
-sudo systemctl restart dovecot
+sudo find /home/bob/Maildir/new -maxdepth 1 -type f
 ~~~
 
-## 5. Verifique portas
+## 5. Valide o acesso à caixa
+
+IMAP:
 
 ~~~bash
-sudo ss -lntp | grep -E ':(25|993|995)\b'
+nc mail.empresa.test 143
 ~~~
 
-## 6. SMTP com STARTTLS
+POP3:
 
 ~~~bash
-openssl s_client   -connect mail.empresa.test:25   -starttls smtp   -servername mail.empresa.test
+nc mail.empresa.test 110
 ~~~
 
-Após o handshake:
+Utilize os comandos praticados na Aula 20.
+
+## 6. Validação por camadas
 
 ~~~text
-EHLO cli.empresa.test
-QUIT
+1. endereço/interface
+2. DNS
+3. serviço
+4. porta
+5. protocolo
+6. entrega local
+7. Maildir
+8. acesso à caixa
+9. logs
 ~~~
 
-## 7. IMAPS
+## 7. Ferramentas de diagnóstico e validação
 
 ~~~bash
-openssl s_client   -connect mail.empresa.test:993   -servername mail.empresa.test
+ip -br addr
+resolvectl status lab0
+dig
+getent
+systemctl
+ss
+nc
+postconf -n
+postfix check
+postqueue -p
+doveconf -n
+find
+journalctl
 ~~~
 
-## 8. POP3S
+O objetivo é sempre responder a uma pergunta técnica específica.
 
-~~~bash
-openssl s_client   -connect mail.empresa.test:995   -servername mail.empresa.test
-~~~
+## 8. Troubleshooting integrado
 
-## 9. Confiança do certificado
+O professor introduzirá uma inconsistência em uma das camadas.
 
-O certificado é autoassinado.
+Exemplo:
 
 ~~~text
-TLS funcionando
-≠
-certificado confiável por uma CA pública
+mail.empresa.test resolve.
+TCP/25 responde.
+A mensagem é aceita.
+O usuário não consegue recuperá-la pelo IMAP.
 ~~~
 
-## 10. Ferramentas de diagnóstico e validação
-
-~~~bash
-openssl x509 -in /etc/ssl/certs/mail.empresa.test.crt -noout -text
-postconf | grep tls
-sudo postfix check
-sudo journalctl -u postfix -n 60 --no-pager
-sudo doveconf -n | grep -E 'ssl|auth'
-sudo journalctl -u dovecot -n 60 --no-pager
-sudo ss -lntp | grep -E ':(25|993|995)\b'
-openssl s_client -connect mail.empresa.test:993 -servername mail.empresa.test
-~~~
-
-## 11. Troubleshooting
-
-O professor introduzirá uma inconsistência relacionada a TLS.
-
-Possíveis sintomas:
+Use:
 
 ~~~text
-A porta está aberta, mas o handshake falha.
-O serviço apresenta certificado diferente do esperado.
-SMTP funciona sem TLS, mas STARTTLS não é anunciado corretamente.
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
 ~~~
 
-O aluno deve localizar a causa usando evidências.
-
-## 12. Portfólio
+## 9. Portfólio
 
 ~~~text
 email/aula-21/
 └── README.md
 ~~~
 
-Inclua certificado, portas, evidências de STARTTLS/IMAPS/POP3S, confiança e troubleshooting.
-
-Não versione a chave privada.
+Documente o fluxo completo, validações por camada e troubleshooting.
