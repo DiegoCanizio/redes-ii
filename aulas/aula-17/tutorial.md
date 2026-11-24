@@ -1,289 +1,390 @@
-# Aula 17 — SFTP e SCP
+# Aula 17 — SMTP e Postfix
 
-## Objetivo
+## Objetivos
 
-Comparar a transferência insegura da Aula 16 com transferência sobre SSH.
+Ao final desta aula, você deverá conseguir:
 
-Hoje você utilizará:
+- explicar o papel do SMTP na arquitetura de correio eletrônico;
+- diferenciar MUA, MTA e caixa postal;
+- configurar um Postfix para entrega local no domínio empresa.test;
+- realizar uma sessão SMTP manual;
+- interpretar códigos básicos de resposta SMTP;
+- consultar configuração efetiva, fila e logs;
+- validar uma entrega até a Maildir;
+- diagnosticar um incidente relacionado ao serviço SMTP.
 
-```text
-SCP
-SFTP
-```
-
-em:
-
-```text
-TCP/22
-```
+Nesta etapa o foco é o SMTP. POP3 e IMAP serão adicionados posteriormente.
 
 ---
 
-# Bloco 0
+## 1. Arquitetura inicial
+
+~~~text
+cliente
+  │
+  │ SMTP
+  │ TCP/25
+  ▼
+Postfix
+  │
+  ▼
+Maildir do usuário
+~~~
+
+Termos:
+
+~~~text
+MUA → programa utilizado pelo usuário para lidar com mensagens
+MTA → servidor responsável por transportar/entregar mensagens
+Maildir → formato de armazenamento da caixa postal
+~~~
+
+Nesta aula o Postfix atua como MTA.
+
+---
+
+## 2. Instale as ferramentas
 
 Servidor:
 
-```bash
+~~~bash
 sudo apt update
-sudo apt install -y openssh-server tcpdump
-sudo systemctl start ssh
-```
+sudo DEBIAN_FRONTEND=noninteractive apt install -y postfix
+~~~
 
 Cliente:
 
-```bash
+~~~bash
 sudo apt update
-sudo apt install -y openssh-client tcpdump git gh
-```
+sudo apt install -y netcat-openbsd
+~~~
 
-Verifique no servidor:
+Confirme no servidor:
 
-```bash
-systemctl is-active ssh
-ss -lntp | grep ':22'
-```
-
-Prepare seu portfólio.
+~~~bash
+systemctl status postfix --no-pager
+sudo ss -lntp | grep ':25'
+~~~
 
 ---
 
-# Parte 1 — SCP
-
-Cliente:
-
-```bash
-echo "Arquivo via SCP" > scp-cliente.txt
-```
-
-Envie:
-
-```bash
-scp scp-cliente.txt \
-  <USUARIO>@192.168.50.10:~/
-```
-
-No servidor, confirme.
-
-Depois, no cliente:
-
-```bash
-scp <USUARIO>@192.168.50.10:~/scp-cliente.txt \
-  scp-retorno.txt
-```
-
----
-
-# Parte 2 — SFTP
-
-Cliente:
-
-```bash
-sftp <USUARIO>@192.168.50.10
-```
-
-Dentro da sessão:
-
-```text
-pwd
-lpwd
-ls
-lls
-put scp-cliente.txt
-get scp-cliente.txt copia-sftp.txt
-bye
-```
-
-Explique:
-
-```text
-pwd:
-____________________________________________________________
-
-lpwd:
-____________________________________________________________
-```
-
----
-
-# Parte 3 — Capture SFTP
+## 3. Crie usuários de laboratório
 
 Servidor:
 
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A 'tcp port 22'
-```
+~~~bash
+sudo adduser alice
+sudo adduser bob
+~~~
 
-Cliente: abra SFTP e transfira um arquivo.
+Utilize senhas temporárias de laboratório.
 
-Observe.
+Prepare a Maildir:
 
----
-
-# Parte 4 — Compare com FTP
-
-Complete:
-
-| Observação | FTP | SFTP |
-|---|---|---|
-| Porta principal | | |
-| Usuário visível em texto claro na captura? | | |
-| Senha visível em texto claro? | | |
-| Conteúdo do arquivo legível diretamente? | | |
-| Usa SSH? | | |
+~~~bash
+sudo -u alice mkdir -p /home/alice/Maildir/{cur,new,tmp}
+sudo -u bob mkdir -p /home/bob/Maildir/{cur,new,tmp}
+~~~
 
 ---
 
-# Parte 5 — Salve uma captura
+## 4. Configure o Postfix
 
-Servidor:
+Aplique:
 
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -c 40 \
-  -w aula-17-sftp.pcap 'tcp port 22'
-```
+~~~bash
+sudo postconf -e 'myhostname = mail.empresa.test'
+sudo postconf -e 'mydomain = empresa.test'
+sudo postconf -e 'myorigin = $mydomain'
+sudo postconf -e 'inet_interfaces = all'
+sudo postconf -e 'inet_protocols = ipv4'
+sudo postconf -e 'mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain'
+sudo postconf -e 'mynetworks = 127.0.0.0/8, 192.168.50.0/24'
+sudo postconf -e 'home_mailbox = Maildir/'
+~~~
 
-Faça uma pequena transferência.
+Observe a configuração efetiva:
 
----
+~~~bash
+postconf -n
+~~~
 
-# Parte 6 — FTP, SFTP e SCP
+Consulte individualmente:
 
-Complete:
-
-```text
-FTP:
-____________________________________________________________
-
-SFTP:
-____________________________________________________________
-
-SCP:
-____________________________________________________________
-```
-
-Importante:
-
-> SFTP não é “FTP na porta 22”. Ele é um protocolo de transferência sobre SSH.
-
----
-
-# Parte 7 — Incidente de permissão
-
-Servidor:
-
-```bash
-sudo mkdir -p /srv/restrito
-sudo chmod 755 /srv/restrito
-sudo chown root:root /srv/restrito
-```
-
-No SFTP, tente enviar um arquivo para:
-
-```text
-/srv/restrito/
-```
-
-Registre a mensagem.
+~~~bash
+postconf myhostname
+postconf mydomain
+postconf mydestination
+postconf mynetworks
+postconf home_mailbox
+~~~
 
 ---
 
-# Parte 8 — Diagnostique
+## 5. Valide antes de reiniciar
 
-Perguntas:
+~~~bash
+sudo postfix check
+~~~
 
-### A conexão SSH/SFTP funcionou?
+Se não houver erro:
 
-```text
-☐ Sim
-☐ Não
-```
+~~~bash
+sudo systemctl restart postfix
+~~~
 
-### A autenticação funcionou?
+Depois:
 
-```text
-☐ Sim
-☐ Não
-```
+~~~bash
+systemctl is-active postfix
+sudo ss -lntp | grep ':25'
+~~~
 
-### Então a falha está necessariamente na rede?
+---
 
-```text
-☐ Sim
-☐ Não
-```
+## 6. Converse manualmente com o SMTP
 
-Servidor:
+No cliente:
 
-```bash
-ls -ld /srv/restrito
-id
-```
+~~~bash
+nc 192.168.50.10 25
+~~~
+
+Digite:
+
+~~~text
+EHLO cli.empresa.test
+MAIL FROM:<alice@empresa.test>
+RCPT TO:<bob@empresa.test>
+DATA
+Subject: Teste SMTP
+From: alice@empresa.test
+To: bob@empresa.test
+
+Mensagem enviada manualmente durante a aula.
+.
+QUIT
+~~~
+
+Observe os códigos retornados.
+
+Códigos que devem aparecer em uma sessão normal:
+
+~~~text
+220 → serviço pronto
+250 → operação aceita
+354 → servidor aguardando o conteúdo da mensagem
+221 → encerramento da sessão
+~~~
+
+---
+
+## 7. Confirme a entrega
+
+No servidor:
+
+~~~bash
+sudo find /home/bob/Maildir/new -maxdepth 1 -type f -printf '%f
+'
+~~~
+
+Escolha uma mensagem e leia as primeiras linhas:
+
+~~~bash
+sudo sed -n '1,80p' /home/bob/Maildir/new/ARQUIVO
+~~~
+
+Neste momento nenhum POP3 ou IMAP foi necessário.
+
+O Postfix recebeu a mensagem por SMTP e realizou a entrega local.
+
+---
+
+## 8. Observe a fila
+
+~~~bash
+postqueue -p
+~~~
+
+Em situação normal de entrega local imediata, a fila tende a estar vazia.
+
+Também conheça:
+
+~~~bash
+mailq
+~~~
+
+---
+
+## 9. Observe os logs
+
+~~~bash
+sudo journalctl -u postfix -n 60 --no-pager
+~~~
+
+Quando disponível no sistema:
+
+~~~bash
+sudo tail -n 60 /var/log/mail.log
+~~~
+
+Procure informações relacionadas a:
+
+~~~text
+conexão
+remetente
+destinatário
+queue ID
+entrega
+status
+~~~
+
+---
+
+## 10. Ferramentas de diagnóstico e validação
+
+### Configuração efetiva
+
+~~~bash
+postconf -n
+~~~
+
+Pergunta: quais valores diferem dos padrões do Postfix?
+
+### Validação
+
+~~~bash
+sudo postfix check
+~~~
+
+Pergunta: a configuração apresenta inconsistência estrutural conhecida pelo Postfix?
+
+### Serviço e porta
+
+~~~bash
+systemctl is-active postfix
+sudo ss -lntp | grep ':25'
+~~~
+
+Pergunta: o serviço está ativo e aceitando conexões SMTP?
+
+### Sessão SMTP
+
+~~~bash
+nc 192.168.50.10 25
+~~~
+
+Pergunta: a rede, a porta e o protocolo estão funcionando até qual etapa?
+
+### Fila
+
+~~~bash
+postqueue -p
+~~~
+
+Pergunta: a mensagem foi entregue ou permaneceu pendente?
+
+### Logs
+
+~~~bash
+sudo journalctl -u postfix -n 60 --no-pager
+~~~
+
+Pergunta: qual decisão o MTA tomou para a mensagem?
+
+### Caixa postal
+
+~~~bash
+sudo find /home/bob/Maildir -maxdepth 2 -type f
+~~~
+
+Pergunta: a mensagem chegou ao armazenamento final?
+
+---
+
+## 11. Troubleshooting
+
+O professor introduzirá uma inconsistência no ambiente SMTP.
+
+Você receberá o sintoma, não a causa.
+
+Exemplos de comportamento que podem ser observados:
+
+~~~text
+TCP/25 responde, mas um destinatário local é rejeitado.
+ou
+A mensagem é aceita, mas não aparece na Maildir esperada.
+~~~
+
+A correção não deve ser feita por tentativa aleatória.
 
 Registre:
 
-```text
-Sintoma:
-____________________________________________________________
-
-Evidência:
-____________________________________________________________
-
-Causa:
-____________________________________________________________
-```
+~~~text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+~~~
 
 ---
 
-# Parte 9 — Portfólio
+## 12. Portfólio
 
-```text
-transferencia/aula-17/
+Organize:
+
+~~~text
+email/aula-17/
 ├── README.md
-└── aula-17-sftp.pcap
-```
+└── postfix-parametros.txt
+~~~
 
-README:
+Gere:
 
-```markdown
-# Aula 17 — SFTP e SCP
+~~~bash
+postconf -n > ~/postfix-parametros.txt
+~~~
 
-## SCP
+O README deve conter:
 
-## SFTP
+~~~markdown
+# Aula 17 — SMTP e Postfix
 
-## Comparação com FTP
+## Arquitetura
+- MUA:
+- MTA:
+- Maildir:
 
-| Item | FTP | SFTP/SCP |
-|---|---|---|
-| Porta | | |
-| Criptografia | | |
-| Credenciais em claro | | |
-| Conteúdo em claro | | |
+## Parâmetros
+- myhostname:
+- mydomain:
+- mydestination:
+- mynetworks:
+- home_mailbox:
 
-## Captura
-O que continuou observável?
-O que não apareceu em texto claro?
+## Sessão SMTP
+- porta:
+- comandos:
+- códigos observados:
 
-## Incidente de permissão
+## Validação
+- postfix check:
+- serviço:
+- porta:
+- entrega:
+- fila:
+- logs:
+
+## Troubleshooting
 ### Sintoma
-### Evidência
+### Hipótese
+### Testes e evidências
 ### Causa
+### Correção
+### Validação
+~~~
 
-## Síntese
-Explique por que SFTP e FTP não devem ser tratados como o mesmo protocolo.
-```
-
-Versione:
-
-```bash
-git add transferencia/aula-17
-git commit -m "Aula 17 - compara SFTP SCP e FTP"
-git push
-gh auth logout
-```
-
----
-
-# Próximo bloco
-
-Arquitetura de e-mail, SMTP, Postfix, POP3, IMAP e TLS.
+Não versione senhas ou outros segredos.
