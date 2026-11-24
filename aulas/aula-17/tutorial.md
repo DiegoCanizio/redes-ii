@@ -49,13 +49,16 @@ A porta 21 estar acessível não garante que uma transferência de dados funcion
 
 ## 3. Modo passivo
 
-A configuração utiliza:
+A configuração preparada na Aula 16 utiliza:
 
 ~~~conf
 pasv_enable=YES
+pasv_address=192.168.50.10
 pasv_min_port=40000
 pasv_max_port=40010
 ~~~
+
+Essas diretivas tornam o canal de dados passivo previsível no laboratório.
 
 No cliente:
 
@@ -120,9 +123,9 @@ No servidor:
 
 ~~~bash
 id ftpuser
-ls -ld /home/ftpuser
-sudo -u ftpuser mkdir -p /home/ftpuser/upload
-ls -ld /home/ftpuser/upload
+ls -ld /srv/ftp/ftpuser /srv/ftp/ftpuser/arquivos
+sudo -u ftpuser mkdir -p /srv/ftp/ftpuser/arquivos
+ls -ld /srv/ftp/ftpuser/arquivos
 ~~~
 
 No cliente, teste upload para esse diretório.
@@ -136,7 +139,8 @@ systemctl status vsftpd --no-pager
 sudo ss -lntp | grep ':21'
 lftp -d -u ftpuser ftp://192.168.50.10
 id ftpuser
-namei -l /home/ftpuser/upload
+namei -l /srv/ftp/ftpuser/arquivos
+sudo tail -n 30 /var/log/vsftpd.log
 sudo journalctl -u vsftpd -n 50 --no-pager
 sudo tcpdump -ni lab0 -nn 'tcp port 21 or portrange 40000-40010'
 ~~~
