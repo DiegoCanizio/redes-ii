@@ -1,385 +1,157 @@
-# Aula 19 — POP3 e IMAP4 com Dovecot
+# Aula 19 — Postfix, DNS e registros MX
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- explicar a diferença de função entre SMTP e os protocolos de acesso à caixa postal;
-- configurar Dovecot utilizando Maildir;
-- disponibilizar IMAP4 em TCP/143;
-- disponibilizar POP3 em TCP/110;
-- realizar autenticação e leitura manual de mensagens;
-- comparar o comportamento básico de IMAP e POP3;
-- utilizar logs, portas e estado da Maildir no diagnóstico;
-- diagnosticar um incidente de acesso à caixa postal.
+- explicar o papel do registro MX;
+- publicar mail.empresa.test no DNS;
+- criar e validar o MX de empresa.test;
+- relacionar DNS e SMTP sem confundir suas funções;
+- validar nome, porta, Postfix, fila e entrega separadamente;
+- diagnosticar uma inconsistência entre DNS e correio eletrônico.
 
-Nesta aula as credenciais trafegarão sem TLS apenas dentro da rede isolada do laboratório. A proteção será adicionada posteriormente.
-
----
-
-## 1. Arquitetura
-
-O SMTP já entrega a mensagem.
-
-Agora adicionaremos acesso remoto à caixa postal:
+## 1. Fluxo esperado
 
 ~~~text
-remetente
-   │
-   │ SMTP
-   ▼
- Postfix
-   │
-   ▼
-Maildir de bob
-   ▲
-   │
-   ├── IMAP4 TCP/143
-   │
-   └── POP3  TCP/110
-   │
- cliente
+bob@empresa.test
+      │
+      ▼
+empresa.test MX 10 mail.empresa.test.
+      │
+      ▼
+mail.empresa.test A 192.168.50.10
+      │
+      ▼
+TCP/25 → Postfix
 ~~~
 
-SMTP envia/transporta mensagens.
-
-IMAP e POP3 permitem acesso às mensagens armazenadas.
-
----
-
-## 2. Prepare o estado anterior
-
-No servidor:
-
-~~~bash
-systemctl is-active postfix
-postconf home_mailbox
-sudo find /home/bob/Maildir -maxdepth 2 -type f
-~~~
-
-Garanta que bob possua pelo menos uma mensagem na Maildir.
-
-Caso necessário, envie uma nova mensagem pelo SMTP como praticado anteriormente.
-
----
-
-## 3. Instale o Dovecot
+## 2. Verifique o estado inicial
 
 Servidor:
 
 ~~~bash
-sudo apt update
-sudo apt install -y dovecot-core dovecot-imapd dovecot-pop3d tcpdump
+ip -4 -br addr show lab0
+systemctl is-active bind9
+systemctl is-active postfix
+sudo ss -lntup | grep -E ':(25|53)$|:(25|53)[[:space:]]'
 ~~~
 
-Observe:
+Cliente:
 
 ~~~bash
-systemctl status dovecot --no-pager
+resolvectl status lab0
+dig empresa.test
 ~~~
 
----
-
-## 4. Habilite os protocolos
-
-Edite:
+## 3. Adicione os registros
 
 ~~~bash
-sudo nano /etc/dovecot/dovecot.conf
+sudo nano /etc/bind/db.empresa.test
 ~~~
 
-Garanta:
+Adicione:
 
-~~~conf
-protocols = imap pop3
+~~~dns
+mail    IN  A   192.168.50.10
+@       IN  MX  10 mail.empresa.test.
 ~~~
 
----
+Atualize o serial SOA.
 
-## 5. Configure Maildir
-
-Edite:
+## 4. Valide antes de recarregar
 
 ~~~bash
-sudo nano /etc/dovecot/conf.d/10-mail.conf
+sudo named-checkconf
+sudo named-checkzone empresa.test /etc/bind/db.empresa.test
+sudo systemctl reload bind9
 ~~~
 
-Defina:
-
-~~~conf
-mail_location = maildir:~/Maildir
-~~~
-
----
-
-## 6. Permita autenticação em claro somente no laboratório
-
-Edite:
+## 5. Consulte o MX
 
 ~~~bash
-sudo nano /etc/dovecot/conf.d/10-auth.conf
+dig empresa.test MX
+dig mail.empresa.test A
+dig +short empresa.test MX
+dig +short mail.empresa.test A
 ~~~
 
-Para esta etapa controlada:
-
-~~~conf
-disable_plaintext_auth = no
-auth_mechanisms = plain login
-~~~
-
-Não trate essa configuração como adequada para uma rede não confiável.
-
----
-
-## 7. Valide a configuração
-
-Antes de reiniciar:
-
-~~~bash
-sudo doveconf -n
-~~~
-
-Revise a saída.
-
-Depois:
-
-~~~bash
-sudo systemctl restart dovecot
-~~~
-
-Confirme:
-
-~~~bash
-systemctl is-active dovecot
-sudo ss -lntp | grep -E ':(110|143)'
-~~~
-
----
-
-## 8. Teste IMAP4
-
-No cliente:
-
-~~~bash
-nc 192.168.50.10 143
-~~~
-
-Digite:
+Esperado:
 
 ~~~text
-a1 LOGIN bob SENHA_TEMPORARIA
-a2 SELECT INBOX
-a3 FETCH 1 BODY[]
-a4 LOGOUT
+10 mail.empresa.test.
+192.168.50.10
 ~~~
 
-Observe que os comandos IMAP utilizam identificadores como a1, a2 e a3.
-
-Registre:
-
-- a autenticação funcionou?
-- quantas mensagens a caixa informou?
-- a mensagem pôde ser lida?
-
----
-
-## 9. Teste POP3
-
-No cliente:
+## 6. Separe DNS de SMTP
 
 ~~~bash
-nc 192.168.50.10 110
+dig mail.empresa.test
+nc -vz 192.168.50.10 25
+nc -vz mail.empresa.test 25
 ~~~
 
-Digite:
+Interprete:
 
 ~~~text
-USER bob
-PASS SENHA_TEMPORARIA
-STAT
-LIST
-RETR 1
-QUIT
+dig falha → investigar DNS
+dig funciona + TCP/25 falha → rede, firewall, porta ou serviço
+dig funciona + TCP/25 responde → avançar para SMTP
 ~~~
 
-Registre:
-
-- quantidade de mensagens;
-- tamanho informado;
-- conteúdo recuperado.
-
-Não conclua que POP3 sempre remove mensagens. A remoção depende dos comandos executados e do comportamento do cliente.
-
----
-
-## 10. Observe as credenciais na rede
-
-No servidor:
+## 7. Envie usando o nome
 
 ~~~bash
-sudo tcpdump -ni lab0 -nn -A   'tcp port 110 or tcp port 143'
+nc mail.empresa.test 25
 ~~~
 
-No cliente, repita uma autenticação utilizando somente a senha temporária.
+Envie uma mensagem para bob@empresa.test e confirme a Maildir.
 
-Observe o tráfego.
-
-Isso prepara a motivação para TLS.
-
----
-
-## 11. Compare IMAP e POP3
-
-Registre:
-
-| Aspecto | IMAP4 | POP3 |
-|---|---|---|
-| Porta desta aula | 143 | 110 |
-| Acessa caixa remota | | |
-| Permite selecionar mailbox | | |
-| Permite recuperar mensagem | | |
-| Credenciais protegidas nesta etapa | | |
-
-A comparação deve ser baseada no que você observou, não apenas em definições memorizadas.
-
----
-
-## 12. Ferramentas de diagnóstico e validação
-
-### Configuração efetiva
+## 8. Observe um domínio público
 
 ~~~bash
-sudo doveconf -n
+dig gmail.com MX
 ~~~
 
-### Serviço
+Observe prioridades e múltiplos servidores. Não será realizado envio externo.
+
+## 9. Ferramentas de diagnóstico e validação
 
 ~~~bash
-systemctl status dovecot --no-pager
-systemctl is-active dovecot
+sudo named-checkconf
+sudo named-checkzone empresa.test /etc/bind/db.empresa.test
+dig empresa.test MX
+dig mail.empresa.test A
+getent hosts mail.empresa.test
+postconf myhostname
+postconf mydomain
+postconf mydestination
+sudo postfix check
+systemctl is-active postfix
+sudo ss -lntp | grep ':25'
+postqueue -p
+sudo journalctl -u postfix -n 60 --no-pager
 ~~~
 
-### Portas
+## 10. Troubleshooting
 
-~~~bash
-sudo ss -lntp | grep -E ':(110|143)'
-~~~
-
-### Logs
-
-~~~bash
-sudo journalctl -u dovecot -n 60 --no-pager
-~~~
-
-### Caixa postal
-
-~~~bash
-sudo find /home/bob/Maildir -maxdepth 2 -type f
-~~~
-
-### Usuário
-
-~~~bash
-id bob
-sudo ls -ld /home/bob /home/bob/Maildir
-~~~
-
-### Protocolo
-
-~~~bash
-nc 192.168.50.10 143
-nc 192.168.50.10 110
-~~~
-
-### Tráfego
-
-~~~bash
-sudo tcpdump -ni lab0 -nn -A   'tcp port 110 or tcp port 143'
-~~~
-
-As ferramentas permitem separar:
+Possíveis sintomas:
 
 ~~~text
-porta inacessível
-≠
-serviço com erro
-≠
-falha de autenticação
-≠
-caixa postal ausente/incorreta
+mail.empresa.test não resolve
+o nome resolve, mas TCP/25 não responde
+DNS e porta funcionam, mas a mensagem não chega
 ~~~
 
----
+O aluno deve localizar a camada responsável usando evidências.
 
-## 13. Troubleshooting
-
-O professor introduzirá uma falha relacionada ao acesso à caixa postal.
-
-Exemplos de sintomas possíveis:
-
-~~~text
-A porta responde, mas o login falha.
-~~~
-
-ou:
-
-~~~text
-O SMTP entrega a mensagem, mas o usuário não a encontra no IMAP.
-~~~
-
-Você não receberá o arquivo responsável nem a sequência de testes.
-
-Use evidências para localizar a causa.
-
----
-
-## 14. Portfólio
-
-Organize:
+## 11. Portfólio
 
 ~~~text
 email/aula-19/
-├── README.md
-└── dovecot-config.txt
+└── README.md
 ~~~
 
-No servidor:
-
-~~~bash
-sudo doveconf -n > ~/dovecot-config.txt
-~~~
-
-O README deve conter:
-
-~~~markdown
-# Aula 19 — POP3 e IMAP4
-
-## Arquitetura
-Como Postfix, Maildir e Dovecot se relacionam?
-
-## IMAP4
-- porta:
-- comandos utilizados:
-- resultado:
-
-## POP3
-- porta:
-- comandos utilizados:
-- resultado:
-
-## Captura
-O que foi observado antes de TLS?
-
-## Ferramentas de diagnóstico
-Quais perguntas cada ferramenta responde?
-
-## Troubleshooting
-### Sintoma
-### Hipótese
-### Testes e evidências
-### Causa
-### Correção
-### Validação
-~~~
-
-Não registre a senha de laboratório no repositório.
+Documente A, MX, prioridade, consultas, TCP/25, entrega e troubleshooting.
