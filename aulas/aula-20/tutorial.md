@@ -1,81 +1,91 @@
-# Aula 20 — Sistema de e-mail integrado
+# Aula 20 — POP3 e IMAP4 com Dovecot
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- integrar DNS, SMTP, Maildir, IMAP e POP3;
-- explicar o caminho completo de uma mensagem;
-- validar cada camada separadamente;
-- distinguir falha de resolução, transporte, entrega local e acesso à caixa postal;
-- utilizar ferramentas de validação já conhecidas em sequência coerente;
-- diagnosticar um incidente de integração sem receber um passo a passo.
+- explicar a diferença entre SMTP e protocolos de acesso à caixa postal;
+- configurar Dovecot com Maildir;
+- disponibilizar IMAP4 em TCP/143;
+- disponibilizar POP3 em TCP/110;
+- autenticar e recuperar mensagens;
+- validar configuração, serviço, portas, usuários e Maildir;
+- diagnosticar uma falha de acesso à caixa postal.
 
-## 1. Arquitetura completa
+Nesta etapa, as credenciais serão observadas sem TLS somente na rede isolada do laboratório.
+
+## 1. Arquitetura
 
 ~~~text
-cliente remetente
-      │
-      │ SMTP
-      ▼
-mail.empresa.test
-      │
-      ▼
-    Postfix
-      │
-      ▼
-Maildir do destinatário
-      ▲
-      │
-      ├── IMAP4
-      └── POP3
-      │
-cliente destinatário
-
-DNS:
-empresa.test MX mail.empresa.test
-mail.empresa.test A 192.168.50.10
+SMTP
+  ↓
+Postfix
+  ↓
+Maildir de bob
+  ↑
+  ├── IMAP4 TCP/143
+  └── POP3  TCP/110
+  ↑
+cliente
 ~~~
 
-## 2. Verifique os serviços
+SMTP transporta e entrega mensagens.
 
-No servidor:
+IMAP e POP3 permitem acesso às mensagens armazenadas.
+
+## 2. Prepare o estado anterior
 
 ~~~bash
-systemctl is-active bind9
 systemctl is-active postfix
+postconf home_mailbox
+sudo find /home/bob/Maildir -maxdepth 2 -type f
+~~~
+
+Garanta que bob possua ao menos uma mensagem.
+
+## 3. Instale o Dovecot
+
+~~~bash
+sudo apt update
+sudo apt install -y dovecot-core dovecot-imapd dovecot-pop3d tcpdump
+~~~
+
+## 4. Configure os protocolos
+
+Em `/etc/dovecot/dovecot.conf`:
+
+~~~conf
+protocols = imap pop3
+~~~
+
+Em `/etc/dovecot/conf.d/10-mail.conf`:
+
+~~~conf
+mail_location = maildir:~/Maildir
+~~~
+
+Em `/etc/dovecot/conf.d/10-auth.conf`:
+
+~~~conf
+disable_plaintext_auth = no
+auth_mechanisms = plain login
+~~~
+
+## 5. Valide antes de reiniciar
+
+~~~bash
+sudo doveconf -n
+sudo systemctl restart dovecot
 systemctl is-active dovecot
-sudo ss -lntup | grep -E ':(25|53|110|143)\b'
+sudo ss -lntp | grep -E ':(110|143)\b'
 ~~~
 
-## 3. Valide o DNS
-
-No cliente:
+## 6. Teste IMAP4
 
 ~~~bash
-dig empresa.test MX
-dig mail.empresa.test A
-getent hosts mail.empresa.test
-~~~
-
-## 4. Valide o SMTP
-
-~~~bash
-nc mail.empresa.test 25
-~~~
-
-Envie uma mensagem curta para bob@empresa.test.
-
-No servidor:
-
-~~~bash
-sudo find /home/bob/Maildir/new -maxdepth 1 -type f
-~~~
-
-## 5. Valide IMAP
-
-~~~bash
-nc mail.empresa.test 143
+nc 192.168.50.10 143
 ~~~
 
 ~~~text
@@ -85,10 +95,10 @@ a3 FETCH 1 BODY[]
 a4 LOGOUT
 ~~~
 
-## 6. Valide POP3
+## 7. Teste POP3
 
 ~~~bash
-nc mail.empresa.test 110
+nc 192.168.50.10 110
 ~~~
 
 ~~~text
@@ -100,137 +110,64 @@ RETR 1
 QUIT
 ~~~
 
-## 7. Validação por camadas
+## 8. Observe o tráfego
 
-~~~text
-1. endereço/interface
-2. DNS
-3. serviço
-4. porta
-5. protocolo
-6. entrega local
-7. acesso à mailbox
-8. logs
-~~~
-
-Ferramentas:
+No servidor:
 
 ~~~bash
-ip -br addr
-resolvectl status lab0
-dig
-getent
-systemctl
-ss
-nc
-postqueue
-find
-journalctl
+sudo tcpdump -ni lab0 -nn -A   'tcp port 110 or tcp port 143'
 ~~~
 
-## 8. Ferramentas de diagnóstico e validação
+Repita uma autenticação usando apenas a senha temporária.
 
-DNS:
+Registre o que ficou visível.
 
-~~~bash
-dig empresa.test MX
-dig mail.empresa.test A
-~~~
-
-Postfix:
-
-~~~bash
-postconf -n
-sudo postfix check
-postqueue -p
-sudo journalctl -u postfix -n 60 --no-pager
-~~~
-
-Dovecot:
+## 9. Ferramentas de diagnóstico e validação
 
 ~~~bash
 sudo doveconf -n
+systemctl status dovecot --no-pager
+sudo ss -lntp | grep -E ':(110|143)\b'
 sudo journalctl -u dovecot -n 60 --no-pager
-~~~
-
-Portas:
-
-~~~bash
-sudo ss -lntup | grep -E ':(25|53|110|143)\b'
-~~~
-
-Caixa postal:
-
-~~~bash
 sudo find /home/bob/Maildir -maxdepth 2 -type f
+id bob
+sudo ls -ld /home/bob /home/bob/Maildir
+nc 192.168.50.10 143
+nc 192.168.50.10 110
 ~~~
 
-## 9. Troubleshooting
+Essas ferramentas permitem separar falha de porta, serviço, autenticação e armazenamento.
 
-O professor introduzirá uma inconsistência em uma das camadas do sistema.
+## 10. Troubleshooting
 
-Você receberá apenas o comportamento observado.
+O professor introduzirá uma falha relacionada ao acesso à caixa postal.
 
-Exemplo:
+Possíveis sintomas:
 
 ~~~text
-O cliente resolve mail.empresa.test.
-A conexão SMTP funciona.
-A mensagem é aceita.
-O usuário não consegue recuperá-la pelo IMAP.
+A porta responde, mas o login falha.
 ~~~
 
-Não suponha imediatamente que o problema está no Dovecot.
-
-Use:
+ou:
 
 ~~~text
-Sintoma
-→ Hipótese
-→ Teste
-→ Evidência
-→ Causa
-→ Correção
-→ Validação
+O SMTP entrega a mensagem, mas o usuário não a encontra no IMAP.
 ~~~
 
-## 10. Portfólio
+Você receberá o sintoma e o estado esperado, não o roteiro de correção.
+
+## 11. Portfólio
 
 ~~~text
 email/aula-20/
-└── README.md
+├── README.md
+└── dovecot-config.txt
 ~~~
 
-Inclua:
+Gere:
 
-~~~markdown
-# Aula 20 — Sistema de e-mail integrado
-
-## Arquitetura
-
-## DNS
-- MX:
-- A:
-
-## SMTP
-- envio:
-- entrega:
-
-## IMAP
-- acesso:
-- leitura:
-
-## POP3
-- acesso:
-- leitura:
-
-## Validação por camadas
-
-## Troubleshooting
-### Sintoma
-### Hipótese
-### Testes e evidências
-### Causa
-### Correção
-### Validação
+~~~bash
+sudo doveconf -n > ~/dovecot-config.txt
 ~~~
+
+Documente IMAP, POP3, Maildir, captura, ferramentas e troubleshooting.
