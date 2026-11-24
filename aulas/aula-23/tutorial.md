@@ -1,221 +1,96 @@
-# Aula 23 — Troubleshooting de firewall
+# Aula 23 — Firewall aplicado e troubleshooting
 
-## Objetivo
+## Objetivos
 
-Distinguir:
+Ao final desta aula, você deverá conseguir:
 
-```text
-serviço parado
-```
+- transformar requisitos de serviço em regras de firewall;
+- restringir acessos por origem;
+- testar portas permitidas e bloqueadas;
+- interpretar a ordem das regras;
+- utilizar ruleset, tcpdump e testes de aplicação;
+- diagnosticar falhas de filtragem sem roteiro de correção.
 
-de:
+## 1. Estado inicial
 
-```text
-serviço ativo + firewall bloqueando
-```
-
----
-
-# Bloco 0
-
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y nftables nginx openssh-server python3 tcpdump
-```
-
-Cliente:
-
-```bash
-sudo apt update
-sudo apt install -y curl netcat-openbsd tcpdump git gh
-```
-
-Recupere o `nftables.conf` da Aula 22:
-
-```bash
-sudo nft -c -f /etc/nftables.conf
-sudo nft -f /etc/nftables.conf
-```
-
----
-
-# Parte 1 — Aplicação de teste
-
-Servidor:
-
-```bash
-python3 -m http.server 8080 --bind 192.168.50.10
-```
-
-Em outro terminal:
-
-```bash
-ss -lntp | grep ':8080'
-```
-
-Cliente:
-
-```bash
-curl --max-time 3 http://192.168.50.10:8080/
-```
-
----
-
-# Parte 2 — Libere temporariamente 8080
-
-Servidor:
-
-```bash
-sudo nft add rule inet filter input \
-  ip saddr 192.168.50.0/24 tcp dport 8080 counter accept
-```
-
-Teste novamente.
-
----
-
-# Parte 3 — Incidente A
-
-Pare o servidor Python.
-
-Cliente:
-
-```bash
-nc -vz -w 3 192.168.50.10 8080
-```
-
-Servidor:
-
-```bash
-ss -lntp | grep ':8080'
-```
-
-Capture:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn 'tcp port 8080'
-```
-
-Registre:
-
-```text
-Sintoma:
-____________________________________________________________
-
-Evidência:
-____________________________________________________________
-
-Causa:
-____________________________________________________________
-```
-
----
-
-# Parte 4 — Incidente B
-
-Inicie novamente:
-
-```bash
-python3 -m http.server 8080 --bind 192.168.50.10
-```
-
-Em outro terminal, recarregue o ruleset original:
-
-```bash
-sudo nft -f /etc/nftables.conf
-```
-
-Cliente:
-
-```bash
-nc -vz -w 3 192.168.50.10 8080
-```
-
-Servidor:
-
-```bash
-ss -lntp | grep ':8080'
+~~~bash
 sudo nft list ruleset
-```
+sudo ss -lntup
+~~~
 
-Registre:
+## 2. Regras por origem
 
-```text
-Sintoma:
-____________________________________________________________
+Exemplo:
 
-Evidência:
-____________________________________________________________
+~~~nft
+ip saddr 192.168.50.0/24 tcp dport 80 accept
+~~~
 
-Causa:
-____________________________________________________________
-```
+A regra combina origem, protocolo, porta e ação.
 
----
+## 3. Ordem das regras
 
-# Parte 5 — Compare
-
-| Evidência | Serviço parado | Firewall bloqueando |
-|---|---|---|
-| `ss` mostra LISTEN? | | |
-| pacote chega ao host? | | |
-| regra permite 8080? | | |
-| cliente acessa? | | |
-
----
-
-# Parte 6 — Implemente o requisito
-
-Requisito:
-
-> TCP/8080 deve ser acessível somente a partir de `192.168.50.0/24`.
-
-Adicione ao arquivo:
-
-```nft
-ip saddr 192.168.50.0/24 tcp dport 8080 counter accept
-```
-
-Valide:
-
-```bash
-sudo nft -c -f /etc/nftables.conf
-```
-
-Aplique:
-
-```bash
-sudo nft -f /etc/nftables.conf
-```
-
-Teste.
-
----
-
-# Parte 7 — Veja counters e handles
-
-```bash
+~~~bash
 sudo nft -a list chain inet filter input
-```
+~~~
 
-Observe:
+Leia de cima para baixo.
 
-```text
-counter
-handle
-```
+## 4. Testes controlados
 
----
+~~~bash
+nc -vz 192.168.50.10 22
+nc -vz 192.168.50.10 25
+nc -vz 192.168.50.10 80
+nc -vz 192.168.50.10 143
+~~~
 
-# Parte 8 — Diagnóstico final
+Compare com:
 
-O professor fornecerá apenas o sintoma.
+~~~bash
+sudo ss -lntup
+~~~
+
+Uma porta em LISTEN não garante acesso remoto.
+
+## 5. Observe tráfego
+
+Servidor:
+
+~~~bash
+sudo tcpdump -ni lab0 tcp port 80
+~~~
+
+Cliente:
+
+~~~bash
+curl -v http://192.168.50.10/
+~~~
+
+## 6. Ferramentas de diagnóstico e validação
+
+~~~bash
+sudo nft -c -f /etc/nftables.conf
+sudo nft -a list ruleset
+sudo ss -lntup
+systemctl is-active NOME
+nc -vz 192.168.50.10 PORTA
+curl -v URL
+dig @192.168.50.10 NOME
+sudo tcpdump -ni lab0 FILTRO
+~~~
+
+Também permanecem válidos os validadores específicos dos serviços.
+
+## 7. Troubleshooting
+
+O professor aplicará um ou mais incidentes.
+
+Serão fornecidas funcionalidades esperadas, não a regra incorreta.
 
 Use:
 
-```text
+~~~text
 Sintoma
 → Hipótese
 → Teste
@@ -223,45 +98,13 @@ Sintoma
 → Causa
 → Correção
 → Validação
-```
+~~~
 
-Não altere regras sem evidência.
+## 8. Portfólio
 
----
-
-# Parte 9 — Portfólio
-
-```text
+~~~text
 firewall/aula-23/
-├── README.md
-└── nftables-final.conf
-```
+└── README.md
+~~~
 
-README:
-
-```markdown
-# Aula 23 — Troubleshooting de firewall
-
-## Incidente A — serviço parado
-### Evidências
-### Causa
-### Validação
-
-## Incidente B — firewall
-### Evidências
-### Causa
-### Validação
-
-## Comparação
-
-## Política final
-Justifique a regra TCP/8080.
-```
-
-Versione e encerre a autenticação.
-
----
-
-# Próxima aula
-
-Proxy e filtragem de conteúdo com Squid.
+Registre requisitos, regras, testes e troubleshooting.
