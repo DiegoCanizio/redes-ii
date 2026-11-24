@@ -1,260 +1,135 @@
-# Avaliação Prática 2 — Troubleshooting
+# Aula 25 — Análise de pacotes com tcpdump
 
-## Objetivo
+## Objetivos
 
-Você receberá um ambiente com **dois incidentes independentes**.
+Ao final desta aula, você deverá conseguir:
 
-Seu trabalho não é apenas fazer o serviço voltar a funcionar.
+- escolher interface de captura;
+- aplicar filtros simples;
+- observar conexões TCP e tráfego UDP;
+- relacionar pacotes aos serviços estudados;
+- identificar em qual etapa uma comunicação deixa de progredir;
+- salvar capturas;
+- utilizar tcpdump como ferramenta de troubleshooting.
 
-Você deverá demonstrar:
+## 1. Interface
 
-```text
-Sintoma
-→ Hipótese
-→ Teste
-→ Evidência
-→ Causa
-→ Correção
-→ Validação
-```
+~~~bash
+ip -br link
+sudo tcpdump -ni lab0
+~~~
 
----
+## 2. DNS
 
-# Regras
+Servidor:
 
-Você receberá:
+~~~bash
+sudo tcpdump -ni lab0 -nn 'port 53'
+~~~
 
-- duas VMs;
-- topologia;
-- funcionalidades esperadas;
-- pacote de configuração inicial;
-- sintomas dos incidentes.
+Cliente:
 
-Você **não receberá a causa**.
+~~~bash
+dig @192.168.50.10 empresa.test
+~~~
 
----
+## 3. HTTP
 
-# Preparação
+~~~bash
+sudo tcpdump -ni lab0 -nn 'tcp port 80'
+~~~
 
-Instale os pacotes indicados pelo professor.
+Cliente:
 
-Aplique o pacote inicial exatamente conforme o enunciado.
+~~~bash
+curl http://www.empresa.test/
+~~~
 
-Antes de alterar qualquer coisa:
+## 4. SMTP
 
-```text
-observe o ambiente
-```
+~~~bash
+sudo tcpdump -ni lab0 -nn -A 'tcp port 25'
+~~~
 
----
+Faça uma sessão curta.
 
-# Incidente 1
+## 5. FTP
 
-## Sintoma fornecido
+~~~bash
+sudo tcpdump -ni lab0 -nn 'tcp port 21 or portrange 40000-40010'
+~~~
 
-```text
-[fornecido pelo professor]
-```
+Observe mais de uma conexão.
 
-## Hipótese inicial
+## 6. IMAP e POP3
 
-____________________________________________________________________
+~~~bash
+sudo tcpdump -ni lab0 -nn -A 'tcp port 110 or tcp port 143'
+~~~
 
-## Teste 1
+Compare com TLS:
 
-Comando/ação:
+~~~bash
+sudo tcpdump -ni lab0 -nn 'tcp port 993 or tcp port 995'
+~~~
 
-____________________________________________________________________
+## 7. Flags TCP
 
-Resultado:
+~~~bash
+sudo tcpdump -ni lab0 -nn -vv 'tcp port 80'
+~~~
 
-____________________________________________________________________
+Associe S, S., F e R a SYN, SYN/ACK, FIN e RST.
 
-## O que a evidência indica?
+## 8. Salve uma captura
 
-____________________________________________________________________
+~~~bash
+sudo tcpdump -ni lab0 -nn -c 100 -w ~/aula25-lab0.pcap
+tcpdump -nn -r ~/aula25-lab0.pcap
+~~~
 
-## Teste 2
+## 9. Ferramentas de diagnóstico e validação
 
-Comando/ação:
+Combine tcpdump com:
 
-____________________________________________________________________
+~~~bash
+ip -br addr
+ip route
+ip neigh
+ss -lntup
+systemctl
+journalctl
+dig
+curl
+nc
+openssl s_client
+nft
+~~~
 
-Resultado:
+O tcpdump responde principalmente:
 
-____________________________________________________________________
+~~~text
+o pacote saiu?
+o pacote chegou?
+houve resposta?
+qual protocolo/porta?
+em que ponto a conversa parou?
+~~~
 
-## Hipótese atualizada, se necessário
+## 10. Troubleshooting
 
-____________________________________________________________________
+O professor apresentará um cenário em que uma aplicação não funciona.
 
-## Causa
+O aluno deverá usar tcpdump em conjunto com outras ferramentas para provar onde está a interrupção.
 
-____________________________________________________________________
+Não haverá roteiro de solução.
 
-## Correção
+## 11. Portfólio
 
-____________________________________________________________________
+~~~text
+pacotes/aula-25/
+├── README.md
+└── aula25-lab0.pcap
+~~~
 
-## Validação
-
-Comando/ação:
-
-____________________________________________________________________
-
-Resultado:
-
-____________________________________________________________________
-
----
-
-# Incidente 2
-
-## Sintoma fornecido
-
-```text
-[fornecido pelo professor]
-```
-
-## Hipótese inicial
-
-____________________________________________________________________
-
-## Teste 1
-
-Comando/ação:
-
-____________________________________________________________________
-
-Resultado:
-
-____________________________________________________________________
-
-## O que a evidência indica?
-
-____________________________________________________________________
-
-## Teste 2
-
-Comando/ação:
-
-____________________________________________________________________
-
-Resultado:
-
-____________________________________________________________________
-
-## Hipótese atualizada, se necessário
-
-____________________________________________________________________
-
-## Causa
-
-____________________________________________________________________
-
-## Correção
-
-____________________________________________________________________
-
-## Validação
-
-Comando/ação:
-
-____________________________________________________________________
-
-Resultado:
-
-____________________________________________________________________
-
----
-
-# Entrega
-
-No portfólio:
-
-```text
-avaliacoes/
-└── avaliacao-02/
-    └── README.md
-```
-
-Inclua arquivos de configuração finais apenas quando fizerem parte da correção.
-
----
-
-# Modelo do README
-
-```markdown
-# Avaliação Prática 2 — Troubleshooting
-
-## Incidente 1
-
-### Sintoma
-
-### Hipótese inicial
-
-### Testes e evidências
-
-### Hipótese atualizada
-
-### Causa
-
-### Correção
-
-### Validação
-
----
-
-## Incidente 2
-
-### Sintoma
-
-### Hipótese inicial
-
-### Testes e evidências
-
-### Hipótese atualizada
-
-### Causa
-
-### Correção
-
-### Validação
-
----
-
-## Síntese
-
-Quais evidências foram mais importantes para separar sintoma de causa?
-```
-
----
-
-# Critérios
-
-| Critério | Pontos |
-|---|---:|
-| Método de diagnóstico | 30 |
-| Identificação das causas | 25 |
-| Correções aplicadas | 20 |
-| Validação de ponta a ponta | 15 |
-| Documentação/evidências | 10 |
-| **Total** | **100** |
-
----
-
-# Importante
-
-Uma hipótese inicial pode estar errada.
-
-O que importa é usar evidências para:
-
-```text
-confirmá-la
-ou
-refutá-la
-```
-
-Não aplique várias mudanças ao mesmo tempo sem saber qual delas corrigiu o problema.
-
-Ao finalizar, faça o commit/push conforme orientação do professor e encerre sua autenticação.
+Registre filtros, evidências, interpretação e troubleshooting.
