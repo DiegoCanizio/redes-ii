@@ -4,7 +4,7 @@ Esta pasta contém os roteiros públicos da disciplina **Redes de Computadores I
 
 ## Primeiro bloco
 
-```text
+~~~text
 01  Git, GitHub e início do portfólio
 02  Linux básico, comandos de rede e primeiro script Bash
 03  Interfaces, endereçamento, rotas e Netplan
@@ -20,33 +20,68 @@ Esta pasta contém os roteiros públicos da disciplina **Redes de Computadores I
 13  Nginx, virtual host, DNS e logs
 14  Laboratório integrado e checkpoint
 15  Avaliação 1
-```
+~~~
 
-## Calendário atualizado — novembro de 2026
+## Segundo bloco
 
-| Data | Atividade |
-|---|---|
-| 27/10 | Aula 8 — realizada e validada |
-| 29/10 | Aula 9 — realizada e validada |
-| 03/11 | Aula 10 — DNS reverso e consultas |
-| 05/11 | Conferência da integração DHCP/DNS, HTTP básico e introdução ao Nginx — aulas 11, 12 e início da 13 |
-| 10 e 12/11 | Eventos prováveis; sem conteúdo novo previsto |
-| 17/11 | Continuação da aula 13 — virtual host, acesso por nome, logs e diagnóstico |
-| 19/11 | Sem aula |
-| 24/11 | Aula 14 — laboratório integrado e revisão |
-| 26/11 | Aula 15 — Avaliação 1 |
+~~~text
+16  FTP com vsftpd
+17  SMTP e Postfix
+18  SMTP, DNS e registros MX
+19  POP3 e IMAP4 com Dovecot
+20  Sistema de e-mail integrado
+21  TLS aplicado ao correio eletrônico
+22  Firewall com nftables
+23  Firewall aplicado e troubleshooting
+24  Proxy e filtragem de conteúdo com Squid
+25  Análise de pacotes com tcpdump
+26  Laboratório integrado
+27  Avaliação 2
+~~~
 
-Os números identificam os blocos de conteúdo. Dois tutoriais podem ser utilizados no mesmo encontro. Os eventos são contabilizados como encontros, sem acrescentar conteúdo aos tutoriais. As aulas 1 a 9 já foram utilizadas e testadas. A aula 8 ocorreu em 27/10/2026 e a aula 9 em 29/10/2026; até a aula 9, tudo funcionou conforme relato do professor.
+## Organização dos tutoriais a partir da Aula 16
 
-## Sobre as Aulas 01 a 04
+Os tutoriais do segundo bloco não possuem datas fixas.
 
-Esses roteiros foram consolidados após os encontros para refletir o percurso efetivamente realizado pela turma. Eles não devem ser interpretados como novas tarefas retroativas.
+A numeração representa a **sequência de conteúdo**, não necessariamente um encontro de calendário.
 
-## A partir da Aula 05
+Isso permite utilizar um tutorial inteiro em uma aula de 100 minutos, combinar partes em encontros de 150 minutos ou redistribuir conteúdos sem modificar o material didático.
 
-Os roteiros utilizam a infraestrutura persistente:
+A estrutura pedagógica adotada é:
 
-```text
+~~~text
+conceito e arquitetura
+        ↓
+implantação guiada
+        ↓
+validação funcional
+        ↓
+ferramentas de diagnóstico
+        ↓
+troubleshooting sem roteiro de correção
+~~~
+
+Os comandos de implantação, diagnóstico e validação continuam sendo apresentados explicitamente.
+
+Nas atividades de troubleshooting, o aluno recebe o sintoma e o estado esperado, mas deve selecionar as ferramentas, interpretar evidências, localizar a causa, corrigir e validar.
+
+Método da disciplina:
+
+~~~text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+~~~
+
+## Infraestrutura persistente
+
+Os roteiros utilizam a infraestrutura:
+
+~~~text
 PC Windows
     │
     │ SSH
@@ -57,7 +92,9 @@ srv-r2-sNN
           │
           ▼
       cli-r2-sNN
-```
+~~~
+
+Todos os estudantes podem utilizar a mesma rede interna porque cada laboratório é isolado.
 
 ## Regras permanentes
 
@@ -65,8 +102,9 @@ srv-r2-sNN
 - não criar gateway padrão pela `lab0` sem orientação;
 - não alterar a porta interna 22 do SSH;
 - não versionar senhas, tokens ou chaves privadas;
-- validar uma configuração antes de reiniciar um serviço sempre que a ferramenta permitir;
-- registrar evidências do funcionamento.
+- validar uma configuração antes de reiniciar ou recarregar um serviço sempre que a ferramenta permitir;
+- registrar evidências do funcionamento;
+- utilizar mudanças orientadas por evidências durante troubleshooting.
 
 ## Entregas
 
@@ -79,3 +117,9 @@ Aqui não são publicados:
 - senhas;
 - chaves privadas;
 - anotações exclusivas do professor.
+
+## Observação sobre calendário
+
+Datas, alterações de horário e redistribuição entre encontros devem ser mantidas fora dos tutoriais sempre que possível.
+
+Isso evita que um ajuste de calendário obrigue a modificar materiais cujo conteúdo técnico continua válido.
