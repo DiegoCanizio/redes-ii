@@ -1,124 +1,131 @@
-# Aula 26 — Laboratório integrado
+# Aula 26 — Análise de pacotes com tcpdump
 
-## Missão
+**Bloco de referência:** 100 minutos
 
-Nesta aula você não receberá um roteiro de configuração passo a passo.
+## Objetivos
 
-O objetivo é operar uma infraestrutura composta pelos serviços trabalhados no segundo bloco.
+Ao final desta aula, você deverá conseguir:
 
-Você pode consultar tutoriais anteriores, portfólio, manuais, --help e documentação.
+- escolher a interface de captura;
+- criar filtros simples;
+- observar TCP e UDP;
+- relacionar pacotes aos serviços estudados;
+- identificar em qual etapa uma comunicação deixa de progredir;
+- salvar capturas;
+- utilizar tcpdump como ferramenta de troubleshooting.
 
-## Estado final esperado
-
-Conforme a especificação do professor, o ambiente poderá envolver:
-
-~~~text
-rede
-DHCP
-DNS
-HTTP
-FTP
-SMTP
-IMAP/POP3
-TLS aplicado ao correio
-firewall
-proxy
-~~~
-
-## Validação mínima
-
-Rede:
-~~~text
-[ ] servidor com endereço esperado
-[ ] cliente com configuração esperada
-[ ] comunicação funcional
-~~~
-
-DNS:
-~~~text
-[ ] zona direta
-[ ] zona reversa quando aplicável
-[ ] A
-[ ] MX
-~~~
-
-Web:
-~~~text
-[ ] Nginx ativo
-[ ] nome resolve
-[ ] HTTP responde
-~~~
-
-FTP:
-~~~text
-[ ] autenticação
-[ ] listagem
-[ ] download
-[ ] upload
-~~~
-
-E-mail:
-~~~text
-[ ] SMTP
-[ ] entrega local
-[ ] IMAP ou POP3
-[ ] TLS
-~~~
-
-Firewall/proxy:
-~~~text
-[ ] serviços necessários permitidos
-[ ] acesso não autorizado bloqueado
-[ ] proxy/ACL funcionando quando exigido
-~~~
-
-## Ferramentas disponíveis
+## 1. Interface
 
 ~~~bash
-ip
-ping
+ip -br link
+sudo tcpdump -ni lab0
+~~~
+
+## 2. DNS
+
+~~~bash
+sudo tcpdump -ni lab0 -nn 'port 53'
+~~~
+
+No cliente:
+
+~~~bash
+dig @192.168.50.10 empresa.test
+~~~
+
+## 3. HTTP
+
+~~~bash
+sudo tcpdump -ni lab0 -nn 'tcp port 80'
+~~~
+
+No cliente:
+
+~~~bash
+curl http://www.empresa.test/
+~~~
+
+## 4. SMTP
+
+~~~bash
+sudo tcpdump -ni lab0 -nn -A 'tcp port 25'
+~~~
+
+Faça uma sessão curta.
+
+## 5. FTP
+
+~~~bash
+sudo tcpdump -ni lab0 -nn   'tcp port 21 or portrange 40000-40010'
+~~~
+
+Observe mais de uma conexão.
+
+## 6. IMAP/POP3 e TLS
+
+~~~bash
+sudo tcpdump -ni lab0 -nn -A   'tcp port 110 or tcp port 143'
+~~~
+
+Compare com:
+
+~~~bash
+sudo tcpdump -ni lab0 -nn   'tcp port 993 or tcp port 995'
+~~~
+
+## 7. Flags TCP
+
+~~~bash
+sudo tcpdump -ni lab0 -nn -vv 'tcp port 80'
+~~~
+
+Associe SYN, SYN/ACK, ACK, FIN e RST ao comportamento observado.
+
+## 8. Salve uma captura
+
+~~~bash
+sudo tcpdump -ni lab0 -nn -c 100 -w ~/aula26-lab0.pcap
+tcpdump -nn -r ~/aula26-lab0.pcap
+~~~
+
+## 9. Ferramentas de diagnóstico e validação
+
+Combine tcpdump com:
+
+~~~bash
+ip -br addr
+ip route
 ip neigh
+ss -lntup
 systemctl
-ss
 journalctl
-kea-dhcp4 -t
 dig
-named-checkconf
-named-checkzone
-resolvectl
-nginx -t
 curl
-lftp
-postfix check
-postconf
-postqueue
-doveconf
 nc
 openssl s_client
 nft
-squid -k parse
-tcpdump
 ~~~
 
-## Método
+O tcpdump responde principalmente:
 
 ~~~text
-Sintoma
-→ Hipótese
-→ Teste
-→ Evidência
-→ Causa
-→ Correção
-→ Validação
+o pacote saiu?
+o pacote chegou?
+houve resposta?
+qual protocolo/porta foi utilizado?
+em que ponto a conversa parou?
 ~~~
 
-## Registro
+## 10. Troubleshooting
+
+O professor apresentará um cenário em que uma aplicação não funciona.
+
+O aluno deverá usar tcpdump em conjunto com outras ferramentas para provar onde está a interrupção.
+
+## 11. Portfólio
 
 ~~~text
-integracao/aula-26/
-└── README.md
+pacotes/aula-26/
+├── README.md
+└── aula26-lab0.pcap
 ~~~
-
-Documente incidentes relevantes e o estado final validado.
-
-Este laboratório prepara a avaliação final.
