@@ -1,110 +1,131 @@
-# Aula 23 — Firewall aplicado e troubleshooting
+# Aula 23 — Firewall com nftables
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- transformar requisitos de serviço em regras de firewall;
-- restringir acessos por origem;
-- testar portas permitidas e bloqueadas;
-- interpretar a ordem das regras;
-- utilizar ruleset, tcpdump e testes de aplicação;
-- diagnosticar falhas de filtragem sem roteiro de correção.
+- explicar o papel de um firewall no host;
+- identificar serviços e portas necessários;
+- criar uma política básica com nftables;
+- permitir conexões estabelecidas;
+- liberar serviços explicitamente;
+- validar regras antes de aplicar;
+- distinguir falha de serviço de bloqueio por firewall.
 
-## 1. Estado inicial
+## 1. Observe os serviços
 
 ~~~bash
-sudo nft list ruleset
 sudo ss -lntup
 ~~~
 
-## 2. Regras por origem
+Relacione serviço e porta já estudados.
 
-Exemplo:
+## 2. Instale
+
+~~~bash
+sudo apt update
+sudo apt install -y nftables
+sudo nft list ruleset
+~~~
+
+## 3. Faça backup
+
+~~~bash
+sudo cp /etc/nftables.conf /etc/nftables.conf.original
+~~~
+
+## 4. Crie uma política inicial
 
 ~~~nft
-ip saddr 192.168.50.0/24 tcp dport 80 accept
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0;
+        policy drop;
+
+        iif "lo" accept
+        ct state established,related accept
+        ip protocol icmp accept
+        tcp dport 22 accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0;
+        policy drop;
+    }
+
+    chain output {
+        type filter hook output priority 0;
+        policy accept;
+    }
+}
 ~~~
 
-A regra combina origem, protocolo, porta e ação.
-
-## 3. Ordem das regras
+## 5. Valide antes de aplicar
 
 ~~~bash
-sudo nft -a list chain inet filter input
+sudo nft -c -f /etc/nftables.conf
 ~~~
 
-Leia de cima para baixo.
-
-## 4. Testes controlados
+Depois:
 
 ~~~bash
-nc -vz 192.168.50.10 22
+sudo systemctl restart nftables
+sudo nft list ruleset
+~~~
+
+## 6. Libere os serviços necessários
+
+Conforme o ambiente, acrescente regras para DNS, HTTP, SMTP, IMAP/POP3 e variantes TLS.
+
+Valide novamente antes de aplicar.
+
+## 7. Teste do cliente
+
+Exemplos:
+
+~~~bash
+dig @192.168.50.10 empresa.test
+curl -I http://192.168.50.10/
 nc -vz 192.168.50.10 25
-nc -vz 192.168.50.10 80
-nc -vz 192.168.50.10 143
+nc -vz 192.168.50.10 993
 ~~~
 
-Compare com:
+Teste também uma porta que deve permanecer bloqueada.
 
-~~~bash
-sudo ss -lntup
-~~~
-
-Uma porta em LISTEN não garante acesso remoto.
-
-## 5. Observe tráfego
-
-Servidor:
-
-~~~bash
-sudo tcpdump -ni lab0 tcp port 80
-~~~
-
-Cliente:
-
-~~~bash
-curl -v http://192.168.50.10/
-~~~
-
-## 6. Ferramentas de diagnóstico e validação
+## 8. Ferramentas de diagnóstico e validação
 
 ~~~bash
 sudo nft -c -f /etc/nftables.conf
 sudo nft -a list ruleset
 sudo ss -lntup
-systemctl is-active NOME
+systemctl is-active NOME_DO_SERVICO
 nc -vz 192.168.50.10 PORTA
-curl -v URL
-dig @192.168.50.10 NOME
-sudo tcpdump -ni lab0 FILTRO
+sudo tcpdump -ni lab0 port PORTA
 ~~~
 
-Também permanecem válidos os validadores específicos dos serviços.
+## 9. Troubleshooting
 
-## 7. Troubleshooting
-
-O professor aplicará um ou mais incidentes.
-
-Serão fornecidas funcionalidades esperadas, não a regra incorreta.
-
-Use:
+Exemplo:
 
 ~~~text
-Sintoma
-→ Hipótese
-→ Teste
-→ Evidência
-→ Causa
-→ Correção
-→ Validação
+DNS funciona.
+SMTP funciona.
+HTTP deixou de responder.
+O Nginx continua ativo.
 ~~~
 
-## 8. Portfólio
+O aluno deverá provar se a falha está no serviço, porta, rede ou firewall.
+
+## 10. Portfólio
 
 ~~~text
 firewall/aula-23/
-└── README.md
+├── README.md
+└── nftables.conf
 ~~~
-
-Registre requisitos, regras, testes e troubleshooting.
