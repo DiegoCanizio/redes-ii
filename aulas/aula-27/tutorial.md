@@ -1,263 +1,42 @@
-# Aula 27 — Docker
+# Aula 27 — Avaliação 2
 
 ## Objetivo
 
-Executar um servidor Web em container e reconstruí-lo a partir de arquivos persistentes.
+A Avaliação 2 verificará competências construídas no segundo bloco da disciplina.
 
----
+O detalhamento de ambiente, critérios, composição da nota e regras será fornecido pelo professor separadamente.
 
-# Bloco 0
+## Competências do segundo bloco
 
-Servidor:
+A avaliação poderá considerar:
 
-```bash
-sudo apt update
-sudo apt install -y docker.io
-sudo systemctl enable --now docker
-```
+- FTP;
+- SMTP e Postfix;
+- DNS aplicado ao correio eletrônico;
+- POP3 e IMAP4 com Dovecot;
+- integração do sistema de e-mail;
+- TLS aplicado aos serviços de correio;
+- firewall com nftables;
+- filtragem de conteúdo com proxy;
+- análise de tráfego com tcpdump;
+- diagnóstico e validação técnica.
 
-Verifique:
+## Método de diagnóstico
 
-```bash
-sudo docker version
-```
+~~~text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+~~~
 
-Cliente:
+## Importante
 
-```bash
-sudo apt update
-sudo apt install -y curl git gh
-```
+A avaliação não será um novo tutorial.
 
-Prepare seu portfólio.
+O aluno deverá interpretar o ambiente, selecionar ferramentas adequadas, produzir evidências, corrigir as causas identificadas e validar o estado final solicitado.
 
----
-
-# Parte 1 — Primeiro container
-
-Servidor:
-
-```bash
-sudo docker run --name web-aula27 nginx:alpine
-```
-
-Interrompa com:
-
-```text
-Ctrl+C
-```
-
-Liste:
-
-```bash
-sudo docker ps -a
-```
-
-O container ainda existe?
-
-```text
-☐ Sim
-☐ Não
-```
-
----
-
-# Parte 2 — Background e porta
-
-Remova:
-
-```bash
-sudo docker rm web-aula27
-```
-
-Execute:
-
-```bash
-sudo docker run -d \
-  --name web-aula27 \
-  -p 8080:80 \
-  nginx:alpine
-```
-
-Veja:
-
-```bash
-sudo docker ps
-```
-
-Cliente:
-
-```bash
-curl http://192.168.50.10:8080/
-```
-
----
-
-# Parte 3 — Interprete
-
-```text
-8080:
-____________________________________________________________
-
-80:
-____________________________________________________________
-```
-
----
-
-# Parte 4 — Logs
-
-```bash
-sudo docker logs web-aula27
-```
-
-Faça outra requisição no cliente.
-
-Depois:
-
-```bash
-sudo docker logs --tail 20 web-aula27
-```
-
----
-
-# Parte 5 — Execute comando no container
-
-```bash
-sudo docker exec web-aula27 \
-  nginx -v
-```
-
-Depois:
-
-```bash
-sudo docker exec web-aula27 \
-  ls -l /usr/share/nginx/html
-```
-
----
-
-# Parte 6 — Ciclo de vida
-
-```bash
-sudo docker stop web-aula27
-```
-
-Teste do cliente.
-
-Depois:
-
-```bash
-sudo docker start web-aula27
-```
-
-Teste novamente.
-
----
-
-# Parte 7 — Conteúdo externo ao container
-
-Servidor:
-
-```bash
-mkdir -p ~/docker-aula27/site
-```
-
-```bash
-echo '<h1>Site versionado da Aula 27</h1>' \
-  > ~/docker-aula27/site/index.html
-```
-
-Remova:
-
-```bash
-sudo docker rm -f web-aula27
-```
-
-Recrie:
-
-```bash
-sudo docker run -d \
-  --name web-aula27 \
-  -p 8080:80 \
-  -v "$HOME/docker-aula27/site:/usr/share/nginx/html:ro" \
-  nginx:alpine
-```
-
-Cliente:
-
-```bash
-curl http://192.168.50.10:8080/
-```
-
----
-
-# Parte 8 — Destrua e reconstrua
-
-Servidor:
-
-```bash
-sudo docker rm -f web-aula27
-```
-
-O arquivo ainda existe?
-
-```bash
-cat ~/docker-aula27/site/index.html
-```
-
-Agora recrie o container com o mesmo comando.
-
----
-
-# Parte 9 — Compare VM e container
-
-Complete:
-
-| Aspecto | VM | Container |
-|---|---|---|
-| kernel próprio | | |
-| sistema operacional completo | | |
-| processo isolado | | |
-| imagem para reconstrução | | |
-
----
-
-# Parte 10 — Portfólio
-
-```text
-containers/aula-27/
-├── README.md
-└── site/
-    └── index.html
-```
-
-README:
-
-```markdown
-# Aula 27 — Docker
-
-## Imagem
-
-## Container
-
-## Porta
-- host:
-- container:
-
-## Bind mount
-
-## Reconstrução
-Registre o comando necessário.
-
-## VM × container
-Explique a principal diferença.
-```
-
-Versione e encerre a autenticação.
-
----
-
-# Próxima aula
-
-Docker Compose e múltiplos serviços.
+As orientações específicas da avaliação serão disponibilizadas separadamente para evitar que este tutorial dependa de datas ou de uma dinâmica ainda sujeita a ajustes.
