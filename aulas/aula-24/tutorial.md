@@ -1,132 +1,100 @@
-# Aula 24 — Proxy e filtragem de conteúdo com Squid
+# Aula 24 — Firewall aplicado e troubleshooting
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- diferenciar firewall e proxy de aplicação;
-- configurar um proxy explícito;
-- definir ACL por origem e destino;
-- observar requisições permitidas e negadas;
-- interpretar o access.log;
-- validar a configuração antes de recarregar;
-- diagnosticar falhas de proxy ou ACL.
+- transformar requisitos em regras de firewall;
+- restringir acesso por origem;
+- interpretar ordem e prioridade de regras;
+- testar portas permitidas e bloqueadas;
+- utilizar ruleset, contadores, tcpdump e testes de aplicação;
+- diagnosticar falhas de filtragem sem roteiro de correção.
 
-## 1. Arquitetura
-
-~~~text
-cliente
-  │
-  │ proxy HTTP :3128
-  ▼
-Squid
-  │
-  ▼
-destino Web
-~~~
-
-## 2. Instale
+## 1. Estado inicial
 
 ~~~bash
-sudo apt update
-sudo apt install -y squid
-systemctl status squid --no-pager
-sudo ss -lntp | grep ':3128'
+sudo nft list ruleset
+sudo ss -lntup
 ~~~
 
-## 3. Backup e configuração mínima
+## 2. Regras por origem
+
+Exemplo:
+
+~~~nft
+ip saddr 192.168.50.0/24 tcp dport 80 accept
+~~~
+
+A regra combina origem, protocolo, porta e ação.
+
+## 3. Ordem das regras
 
 ~~~bash
-sudo cp /etc/squid/squid.conf /etc/squid/squid.conf.original
-sudo nano /etc/squid/squid.conf
+sudo nft -a list chain inet filter input
 ~~~
 
-Use:
+Leia de cima para baixo.
 
-~~~conf
-http_port 3128
-
-acl redes2 src 192.168.50.0/24
-
-http_access allow redes2
-http_access deny all
-~~~
-
-Valide:
+## 4. Testes controlados
 
 ~~~bash
-sudo squid -k parse
-sudo systemctl restart squid
+nc -vz 192.168.50.10 22
+nc -vz 192.168.50.10 25
+nc -vz 192.168.50.10 80
+nc -vz 192.168.50.10 993
 ~~~
 
-## 4. Teste
+Compare com:
 
 ~~~bash
-curl -v -x http://192.168.50.10:3128 http://example.com/
+sudo ss -lntup
 ~~~
+
+Uma porta em LISTEN não garante acesso remoto.
+
+## 5. Observe o tráfego
 
 Servidor:
 
 ~~~bash
-sudo tail -n 20 /var/log/squid/access.log
+sudo tcpdump -ni lab0 tcp port 80
 ~~~
 
-## 5. ACL por destino
-
-Antes de `allow redes2`:
-
-~~~conf
-acl bloqueados dstdomain .example.com
-http_access deny bloqueados
-~~~
-
-Valide e recarregue:
+Cliente:
 
 ~~~bash
-sudo squid -k parse
-sudo systemctl reload squid
+curl -v http://192.168.50.10/
 ~~~
 
-Teste novamente.
-
-## 6. HTTPS via proxy explícito
+## 6. Ferramentas de diagnóstico e validação
 
 ~~~bash
-curl -v -x http://192.168.50.10:3128 https://example.com/
+sudo nft -c -f /etc/nftables.conf
+sudo nft -a list ruleset
+sudo ss -lntup
+systemctl is-active NOME
+nc -vz 192.168.50.10 PORTA
+curl -v URL
+dig @192.168.50.10 NOME
+sudo tcpdump -ni lab0 FILTRO
 ~~~
 
-Observe `CONNECT` no log.
+Os validadores específicos dos serviços continuam válidos.
 
-Não faremos interceptação TLS.
+## 7. Troubleshooting
 
-## 7. Firewall x proxy
+O professor aplicará um ou mais incidentes.
 
-Compare atuação por IP/porta, participação na aplicação, ACL por domínio e logs.
+Serão fornecidas as funcionalidades esperadas, não a regra incorreta.
 
-## 8. Ferramentas de diagnóstico e validação
+Use o método da disciplina e registre evidências.
 
-~~~bash
-sudo squid -k parse
-systemctl is-active squid
-sudo ss -lntp | grep ':3128'
-curl -v -x http://192.168.50.10:3128 URL
-sudo tail -n 50 /var/log/squid/access.log
-sudo journalctl -u squid -n 50 --no-pager
-sudo nft list ruleset
-~~~
-
-## 9. Troubleshooting
-
-O professor introduzirá inconsistência em ACL, ordem, porta ou origem.
-
-O aluno recebe somente o comportamento esperado.
-
-## 10. Portfólio
+## 8. Portfólio
 
 ~~~text
-proxy/aula-24/
-├── README.md
-└── squid.conf
+firewall/aula-24/
+└── README.md
 ~~~
-
-Registre arquitetura, ACLs, testes, logs, comparação com firewall e troubleshooting.
