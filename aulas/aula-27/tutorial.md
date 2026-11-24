@@ -1,27 +1,35 @@
-# Aula 27 — Avaliação 2
+# Aula 27 — Troubleshooting integrado de serviços
 
-## Objetivo
+**Bloco de referência:** 100 minutos
 
-A Avaliação 2 verificará competências construídas no segundo bloco da disciplina.
+## Missão
 
-O detalhamento de ambiente, critérios, composição da nota e regras será fornecido pelo professor separadamente.
+Você receberá um ambiente com serviços já estudados e um ou mais comportamentos incorretos.
 
-## Competências do segundo bloco
+Nesta aula não haverá passo a passo de correção.
 
-A avaliação poderá considerar:
+As ferramentas de diagnóstico e validação continuam disponíveis nos tutoriais anteriores.
 
-- FTP;
-- SMTP e Postfix;
-- DNS aplicado ao correio eletrônico;
-- POP3 e IMAP4 com Dovecot;
-- integração do sistema de e-mail;
-- TLS aplicado aos serviços de correio;
-- firewall com nftables;
-- filtragem de conteúdo com proxy;
-- análise de tráfego com tcpdump;
-- diagnóstico e validação técnica.
+## Componentes possíveis
 
-## Método de diagnóstico
+~~~text
+rede
+DHCP
+DNS
+HTTP
+FTP
+SMTP
+IMAP/POP3
+TLS
+firewall
+proxy
+~~~
+
+## Regra principal
+
+Não corrija antes de produzir evidência suficiente para sustentar a hipótese.
+
+Use:
 
 ~~~text
 Sintoma
@@ -33,10 +41,39 @@ Sintoma
 → Validação
 ~~~
 
-## Importante
+## Ferramentas de referência
 
-A avaliação não será um novo tutorial.
+~~~bash
+ip
+ping
+ip neigh
+systemctl
+ss
+journalctl
+kea-dhcp4 -t
+dig
+named-checkconf
+named-checkzone
+resolvectl
+nginx -t
+curl
+lftp
+postfix check
+postconf
+postqueue
+doveconf
+nc
+openssl s_client
+nft
+squid -k parse
+tcpdump
+~~~
 
-O aluno deverá interpretar o ambiente, selecionar ferramentas adequadas, produzir evidências, corrigir as causas identificadas e validar o estado final solicitado.
+## Entrega
 
-As orientações específicas da avaliação serão disponibilizadas separadamente para evitar que este tutorial dependa de datas ou de uma dinâmica ainda sujeita a ajustes.
+~~~text
+integracao/aula-27/
+└── README.md
+~~~
+
+Para cada incidente, documente sintoma, hipótese, testes, evidências, causa, correção e validação.
