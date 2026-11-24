@@ -1,296 +1,124 @@
-# Aula 26 — Monitoramento com SNMP
+# Aula 26 — Laboratório integrado
+
+## Missão
+
+Nesta aula você não receberá um roteiro de configuração passo a passo.
+
+O objetivo é operar uma infraestrutura composta pelos serviços trabalhados no segundo bloco.
+
+Você pode consultar tutoriais anteriores, portfólio, manuais, --help e documentação.
+
+## Estado final esperado
+
+Conforme a especificação do professor, o ambiente poderá envolver:
+
+~~~text
+rede
+DHCP
+DNS
+HTTP
+FTP
+SMTP
+IMAP/POP3
+TLS aplicado ao correio
+firewall
+proxy
+~~~
+
+## Validação mínima
+
+Rede:
+~~~text
+[ ] servidor com endereço esperado
+[ ] cliente com configuração esperada
+[ ] comunicação funcional
+~~~
+
+DNS:
+~~~text
+[ ] zona direta
+[ ] zona reversa quando aplicável
+[ ] A
+[ ] MX
+~~~
+
+Web:
+~~~text
+[ ] Nginx ativo
+[ ] nome resolve
+[ ] HTTP responde
+~~~
+
+FTP:
+~~~text
+[ ] autenticação
+[ ] listagem
+[ ] download
+[ ] upload
+~~~
+
+E-mail:
+~~~text
+[ ] SMTP
+[ ] entrega local
+[ ] IMAP ou POP3
+[ ] TLS
+~~~
+
+Firewall/proxy:
+~~~text
+[ ] serviços necessários permitidos
+[ ] acesso não autorizado bloqueado
+[ ] proxy/ACL funcionando quando exigido
+~~~
+
+## Ferramentas disponíveis
+
+~~~bash
+ip
+ping
+ip neigh
+systemctl
+ss
+journalctl
+kea-dhcp4 -t
+dig
+named-checkconf
+named-checkzone
+resolvectl
+nginx -t
+curl
+lftp
+postfix check
+postconf
+postqueue
+doveconf
+nc
+openssl s_client
+nft
+squid -k parse
+tcpdump
+~~~
 
-## Objetivo
+## Método
 
-Consultar remotamente informações do servidor usando:
+~~~text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+~~~
 
-```text
-SNMP
-```
+## Registro
 
-Nesta aula:
+~~~text
+integracao/aula-26/
+└── README.md
+~~~
 
-```text
-cli-redes2 → gerente
-srv-redes2 → agente
-UDP/161
-```
+Documente incidentes relevantes e o estado final validado.
 
-> Usaremos SNMPv2c somente na rede isolada do laboratório.
-
----
-
-# Bloco 0
-
-Servidor:
-
-```bash
-sudo apt update
-sudo apt install -y snmpd snmp
-```
-
-Cliente:
-
-```bash
-sudo apt update
-sudo apt install -y snmp git gh
-```
-
-Garanta:
-
-```text
-srv-redes2 → 192.168.50.10
-cli-redes2 → 192.168.50.20
-```
-
-Prepare seu portfólio.
-
----
-
-# Parte 1 — Configure o agente
-
-Servidor:
-
-```bash
-sudo cp /etc/snmp/snmpd.conf /etc/snmp/snmpd.conf.original
-```
-
-Edite:
-
-```bash
-sudo nano /etc/snmp/snmpd.conf
-```
-
-Utilize:
-
-```conf
-agentAddress udp:161
-
-rocommunity redes2lab 192.168.50.0/24
-
-sysLocation Laboratorio Redes II
-sysContact professor@empresa.test
-```
-
-Reinicie:
-
-```bash
-sudo systemctl restart snmpd
-```
-
-Verifique:
-
-```bash
-systemctl is-active snmpd
-sudo ss -lunp | grep ':161'
-```
-
----
-
-# Parte 2 — Consulte o nome do sistema
-
-Cliente:
-
-```bash
-snmpget -v2c -c redes2lab \
-  192.168.50.10 \
-  1.3.6.1.2.1.1.5.0
-```
-
-Resultado:
-
-```text
-____________________________________________________________
-```
-
----
-
-# Parte 3 — Consulte o uptime
-
-```bash
-snmpget -v2c -c redes2lab \
-  192.168.50.10 \
-  1.3.6.1.2.1.1.3.0
-```
-
----
-
-# Parte 4 — Faça um walk
-
-```bash
-snmpwalk -v2c -c redes2lab \
-  192.168.50.10 \
-  1.3.6.1.2.1.1
-```
-
-Observe vários objetos.
-
----
-
-# Parte 5 — Interfaces
-
-```bash
-snmpwalk -v2c -c redes2lab \
-  192.168.50.10 \
-  1.3.6.1.2.1.2.2.1.2
-```
-
-No servidor:
-
-```bash
-ip -br link
-```
-
-Compare os nomes.
-
----
-
-# Parte 6 — Contadores
-
-O professor indicará a interface e os OIDs de contadores que serão consultados.
-
-Registre:
-
-```text
-Interface:
-____________________________________________________________
-
-Contador antes:
-____________________________________________________________
-```
-
-Gere tráfego entre cliente e servidor.
-
-Consulte novamente.
-
-```text
-Contador depois:
-____________________________________________________________
-```
-
-Explique a diferença:
-
-____________________________________________________________________
-
----
-
-# Parte 7 — Capture SNMP
-
-Servidor:
-
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A 'udp port 161'
-```
-
-Cliente: repita um `snmpget`.
-
-Observe a captura.
-
----
-
-# Parte 8 — Segurança
-
-Responda:
-
-### A community do SNMPv2c deve ser tratada como senha segura?
-
-```text
-☐ Sim
-☐ Não
-```
-
-### Devemos usar essa configuração fora da rede isolada do laboratório?
-
-```text
-☐ Sim
-☐ Não
-```
-
-Por quê?
-
-____________________________________________________________________
-
----
-
-# Parte 9 — SNMPv3
-
-Registre a ideia:
-
-```text
-SNMPv3 pode adicionar:
-- autenticação;
-- integridade;
-- privacidade/criptografia.
-```
-
-Não será necessário configurá-lo nesta aula.
-
----
-
-# Parte 10 — Observabilidade
-
-Complete:
-
-```text
-SNMP:
-____________________________________________________________
-
-Zabbix:
-____________________________________________________________
-
-Prometheus:
-____________________________________________________________
-
-Grafana:
-____________________________________________________________
-```
-
-O objetivo não é escolher uma única “melhor” ferramenta.
-
----
-
-# Parte 11 — Portfólio
-
-Crie:
-
-```text
-monitoramento/aula-26/
-├── README.md
-└── snmpd.conf
-```
-
-README:
-
-```markdown
-# Aula 26 — SNMP
-
-## Agente
-- endereço:
-- porta:
-- versão:
-
-## Consultas
-- hostname:
-- uptime:
-- interfaces:
-
-## Contadores
-- interface:
-- antes:
-- tráfego:
-- depois:
-
-## Segurança
-Por que SNMPv2c ficou restrito à REDES2?
-
-## Observabilidade
-Como uma ferramenta de monitoramento pode usar essas métricas?
-```
-
-Versione e encerre a autenticação.
-
----
-
-# Próxima aula
-
-Docker e containers.
+Este laboratório prepara a avaliação final.
