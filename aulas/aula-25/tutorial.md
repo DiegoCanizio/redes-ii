@@ -1,135 +1,122 @@
-# Aula 25 — Análise de pacotes com tcpdump
+# Aula 25 — Proxy e filtragem de conteúdo com Squid
+
+**Bloco de referência:** 100 minutos
 
 ## Objetivos
 
 Ao final desta aula, você deverá conseguir:
 
-- escolher interface de captura;
-- aplicar filtros simples;
-- observar conexões TCP e tráfego UDP;
-- relacionar pacotes aos serviços estudados;
-- identificar em qual etapa uma comunicação deixa de progredir;
-- salvar capturas;
-- utilizar tcpdump como ferramenta de troubleshooting.
+- diferenciar firewall e proxy de aplicação;
+- configurar um proxy explícito;
+- definir ACL por origem e destino;
+- observar requisições permitidas e negadas;
+- interpretar o access.log;
+- validar a configuração antes de recarregar;
+- diagnosticar falhas de proxy ou ACL.
 
-## 1. Interface
-
-~~~bash
-ip -br link
-sudo tcpdump -ni lab0
-~~~
-
-## 2. DNS
-
-Servidor:
-
-~~~bash
-sudo tcpdump -ni lab0 -nn 'port 53'
-~~~
-
-Cliente:
-
-~~~bash
-dig @192.168.50.10 empresa.test
-~~~
-
-## 3. HTTP
-
-~~~bash
-sudo tcpdump -ni lab0 -nn 'tcp port 80'
-~~~
-
-Cliente:
-
-~~~bash
-curl http://www.empresa.test/
-~~~
-
-## 4. SMTP
-
-~~~bash
-sudo tcpdump -ni lab0 -nn -A 'tcp port 25'
-~~~
-
-Faça uma sessão curta.
-
-## 5. FTP
-
-~~~bash
-sudo tcpdump -ni lab0 -nn 'tcp port 21 or portrange 40000-40010'
-~~~
-
-Observe mais de uma conexão.
-
-## 6. IMAP e POP3
-
-~~~bash
-sudo tcpdump -ni lab0 -nn -A 'tcp port 110 or tcp port 143'
-~~~
-
-Compare com TLS:
-
-~~~bash
-sudo tcpdump -ni lab0 -nn 'tcp port 993 or tcp port 995'
-~~~
-
-## 7. Flags TCP
-
-~~~bash
-sudo tcpdump -ni lab0 -nn -vv 'tcp port 80'
-~~~
-
-Associe S, S., F e R a SYN, SYN/ACK, FIN e RST.
-
-## 8. Salve uma captura
-
-~~~bash
-sudo tcpdump -ni lab0 -nn -c 100 -w ~/aula25-lab0.pcap
-tcpdump -nn -r ~/aula25-lab0.pcap
-~~~
-
-## 9. Ferramentas de diagnóstico e validação
-
-Combine tcpdump com:
-
-~~~bash
-ip -br addr
-ip route
-ip neigh
-ss -lntup
-systemctl
-journalctl
-dig
-curl
-nc
-openssl s_client
-nft
-~~~
-
-O tcpdump responde principalmente:
+## 1. Arquitetura
 
 ~~~text
-o pacote saiu?
-o pacote chegou?
-houve resposta?
-qual protocolo/porta?
-em que ponto a conversa parou?
+cliente
+  │
+  │ proxy HTTP :3128
+  ▼
+Squid
+  │
+  ▼
+destino Web
 ~~~
 
-## 10. Troubleshooting
+## 2. Instale
 
-O professor apresentará um cenário em que uma aplicação não funciona.
+~~~bash
+sudo apt update
+sudo apt install -y squid
+systemctl status squid --no-pager
+sudo ss -lntp | grep ':3128'
+~~~
 
-O aluno deverá usar tcpdump em conjunto com outras ferramentas para provar onde está a interrupção.
+## 3. Configure
 
-Não haverá roteiro de solução.
+Faça backup e edite `/etc/squid/squid.conf`.
 
-## 11. Portfólio
+Configuração mínima:
+
+~~~conf
+http_port 3128
+
+acl redes2 src 192.168.50.0/24
+
+http_access allow redes2
+http_access deny all
+~~~
+
+Valide:
+
+~~~bash
+sudo squid -k parse
+sudo systemctl restart squid
+~~~
+
+## 4. Teste
+
+~~~bash
+curl -v -x http://192.168.50.10:3128 http://example.com/
+~~~
+
+No servidor:
+
+~~~bash
+sudo tail -n 20 /var/log/squid/access.log
+~~~
+
+## 5. ACL por destino
+
+Antes de `allow redes2`:
+
+~~~conf
+acl bloqueados dstdomain .example.com
+http_access deny bloqueados
+~~~
+
+Valide e recarregue.
+
+## 6. HTTPS via proxy explícito
+
+~~~bash
+curl -v -x http://192.168.50.10:3128 https://example.com/
+~~~
+
+Observe CONNECT no log.
+
+Não faremos interceptação TLS.
+
+## 7. Firewall x proxy
+
+Compare atuação por IP/porta, participação na aplicação, ACL por domínio e logs.
+
+## 8. Ferramentas de diagnóstico e validação
+
+~~~bash
+sudo squid -k parse
+systemctl is-active squid
+sudo ss -lntp | grep ':3128'
+curl -v -x http://192.168.50.10:3128 URL
+sudo tail -n 50 /var/log/squid/access.log
+sudo journalctl -u squid -n 50 --no-pager
+sudo nft list ruleset
+~~~
+
+## 9. Troubleshooting
+
+O professor introduzirá uma inconsistência em ACL, ordem, porta ou origem.
+
+O aluno recebe somente o comportamento esperado.
+
+## 10. Portfólio
 
 ~~~text
-pacotes/aula-25/
+proxy/aula-25/
 ├── README.md
-└── aula25-lab0.pcap
+└── squid.conf
 ~~~
-
-Registre filtros, evidências, interpretação e troubleshooting.
