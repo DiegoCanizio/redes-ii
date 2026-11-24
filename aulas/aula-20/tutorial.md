@@ -1,262 +1,236 @@
-# Aula 20 — POP3 e IMAP com Dovecot
+# Aula 20 — Sistema de e-mail integrado
 
-## Objetivo
+## Objetivos
 
-Acessar remotamente a caixa postal de:
+Ao final desta aula, você deverá conseguir:
 
-```text
-bob@empresa.test
-```
+- integrar DNS, SMTP, Maildir, IMAP e POP3;
+- explicar o caminho completo de uma mensagem;
+- validar cada camada separadamente;
+- distinguir falha de resolução, transporte, entrega local e acesso à caixa postal;
+- utilizar ferramentas de validação já conhecidas em sequência coerente;
+- diagnosticar um incidente de integração sem receber um passo a passo.
 
-usando:
+## 1. Arquitetura completa
 
-```text
-IMAP → TCP/143
-POP3 → TCP/110
-```
+~~~text
+cliente remetente
+      │
+      │ SMTP
+      ▼
+mail.empresa.test
+      │
+      ▼
+    Postfix
+      │
+      ▼
+Maildir do destinatário
+      ▲
+      │
+      ├── IMAP4
+      └── POP3
+      │
+cliente destinatário
 
-> Nesta aula, sem TLS apenas para observação na rede isolada.
+DNS:
+empresa.test MX mail.empresa.test
+mail.empresa.test A 192.168.50.10
+~~~
 
----
+## 2. Verifique os serviços
 
-# Bloco 0
+No servidor:
 
-Servidor:
+~~~bash
+systemctl is-active bind9
+systemctl is-active postfix
+systemctl is-active dovecot
+sudo ss -lntup | grep -E ':(25|53|110|143)\b'
+~~~
 
-```bash
-sudo apt update
-sudo DEBIAN_FRONTEND=noninteractive apt install -y postfix
-sudo apt install -y dovecot-core dovecot-imapd dovecot-pop3d tcpdump
-```
+## 3. Valide o DNS
 
-Cliente:
+No cliente:
 
-```bash
-sudo apt update
-sudo apt install -y netcat-openbsd git gh
-```
+~~~bash
+dig empresa.test MX
+dig mail.empresa.test A
+getent hosts mail.empresa.test
+~~~
 
-Reconstrua o Postfix, usuários e Maildir da Aula 19.
+## 4. Valide o SMTP
 
-Garanta que `bob` tenha pelo menos uma mensagem.
+~~~bash
+nc mail.empresa.test 25
+~~~
 
----
+Envie uma mensagem curta para bob@empresa.test.
 
-# Parte 1 — Configure protocolos
+No servidor:
 
-Servidor:
+~~~bash
+sudo find /home/bob/Maildir/new -maxdepth 1 -type f
+~~~
 
-```bash
-sudo nano /etc/dovecot/dovecot.conf
-```
+## 5. Valide IMAP
 
-Garanta:
+~~~bash
+nc mail.empresa.test 143
+~~~
 
-```conf
-protocols = imap pop3
-```
-
----
-
-# Parte 2 — Maildir
-
-```bash
-sudo nano /etc/dovecot/conf.d/10-mail.conf
-```
-
-Defina:
-
-```conf
-mail_location = maildir:~/Maildir
-```
-
----
-
-# Parte 3 — Autenticação da aula
-
-```bash
-sudo nano /etc/dovecot/conf.d/10-auth.conf
-```
-
-Use:
-
-```conf
-disable_plaintext_auth = no
-auth_mechanisms = plain login
-```
-
-Essa configuração é **somente para a aula isolada**.
-
----
-
-# Parte 4 — Valide
-
-```bash
-sudo doveconf -n
-```
-
-Depois:
-
-```bash
-sudo systemctl restart dovecot
-```
-
-Verifique:
-
-```bash
-ss -lntp | grep -E ':(110|143)\b'
-```
-
----
-
-# Parte 5 — IMAP
-
-Cliente:
-
-```bash
-nc 192.168.50.10 143
-```
-
-Use:
-
-```text
-a1 LOGIN bob <SENHA-DE-LABORATORIO>
+~~~text
+a1 LOGIN bob SENHA_TEMPORARIA
 a2 SELECT INBOX
 a3 FETCH 1 BODY[]
 a4 LOGOUT
-```
+~~~
 
-Registre o que ocorreu.
+## 6. Valide POP3
 
----
+~~~bash
+nc mail.empresa.test 110
+~~~
 
-# Parte 6 — POP3
-
-```bash
-nc 192.168.50.10 110
-```
-
-Use:
-
-```text
+~~~text
 USER bob
-PASS <SENHA-DE-LABORATORIO>
+PASS SENHA_TEMPORARIA
 STAT
 LIST
 RETR 1
 QUIT
-```
+~~~
 
----
+## 7. Validação por camadas
 
-# Parte 7 — Compare
+~~~text
+1. endereço/interface
+2. DNS
+3. serviço
+4. porta
+5. protocolo
+6. entrega local
+7. acesso à mailbox
+8. logs
+~~~
 
-| Item | IMAP | POP3 |
-|---|---|---|
-| Porta desta aula | | |
-| Login funcionou? | | |
-| Mensagem permaneceu no servidor? | | |
-| Comandos observados | | |
+Ferramentas:
 
-Não conclua que POP3 obrigatoriamente apaga mensagens; isso depende da operação realizada.
+~~~bash
+ip -br addr
+resolvectl status lab0
+dig
+getent
+systemctl
+ss
+nc
+postqueue
+find
+journalctl
+~~~
 
----
+## 8. Ferramentas de diagnóstico e validação
 
-# Parte 8 — Capture
+DNS:
 
-Servidor:
+~~~bash
+dig empresa.test MX
+dig mail.empresa.test A
+~~~
 
-```bash
-sudo tcpdump -i <INTERFACE-REDES2> -nn -A \
-  'tcp port 110 or tcp port 143'
-```
+Postfix:
 
-Faça novo login usando apenas a senha temporária de laboratório.
+~~~bash
+postconf -n
+sudo postfix check
+postqueue -p
+sudo journalctl -u postfix -n 60 --no-pager
+~~~
 
-Pergunta:
+Dovecot:
 
-### A senha ficou visível?
+~~~bash
+sudo doveconf -n
+sudo journalctl -u dovecot -n 60 --no-pager
+~~~
 
-```text
-☐ Sim
-☐ Não
-```
+Portas:
 
----
+~~~bash
+sudo ss -lntup | grep -E ':(25|53|110|143)\b'
+~~~
 
-# Parte 9 — Incidente de autenticação
+Caixa postal:
 
-Use uma senha incorreta.
+~~~bash
+sudo find /home/bob/Maildir -maxdepth 2 -type f
+~~~
 
-Registre:
+## 9. Troubleshooting
 
-```text
-A porta respondeu?
-____________________________________________________________
+O professor introduzirá uma inconsistência em uma das camadas do sistema.
 
-O serviço respondeu?
-____________________________________________________________
+Você receberá apenas o comportamento observado.
 
-A autenticação funcionou?
-____________________________________________________________
-```
+Exemplo:
 
-Consulte no servidor:
+~~~text
+O cliente resolve mail.empresa.test.
+A conexão SMTP funciona.
+A mensagem é aceita.
+O usuário não consegue recuperá-la pelo IMAP.
+~~~
 
-```bash
-sudo journalctl -u dovecot -n 30
-```
+Não suponha imediatamente que o problema está no Dovecot.
 
----
+Use:
 
-# Parte 10 — Portfólio
+~~~text
+Sintoma
+→ Hipótese
+→ Teste
+→ Evidência
+→ Causa
+→ Correção
+→ Validação
+~~~
 
-Crie:
+## 10. Portfólio
 
-```text
+~~~text
 email/aula-20/
-├── README.md
-└── dovecot-config.txt
-```
+└── README.md
+~~~
 
-No servidor:
+Inclua:
 
-```bash
-sudo doveconf -n > ~/dovecot-config.txt
-```
+~~~markdown
+# Aula 20 — Sistema de e-mail integrado
 
-Copie para o portfólio.
+## Arquitetura
 
-README:
+## DNS
+- MX:
+- A:
 
-```markdown
-# Aula 20 — Dovecot
+## SMTP
+- envio:
+- entrega:
 
 ## IMAP
-- porta:
-- comandos:
+- acesso:
+- leitura:
 
 ## POP3
-- porta:
-- comandos:
+- acesso:
+- leitura:
 
-## Comparação
+## Validação por camadas
 
-## Captura
-O que ficou visível?
-
-## Segurança
-Por que a configuração desta aula não deve ser usada em uma rede não confiável?
-
-## Incidente
-```
-
-Nunca registre a senha.
-
-Versione e encerre a autenticação.
-
----
-
-# Próxima aula
-
-TLS para SMTP, IMAP e POP3.
+## Troubleshooting
+### Sintoma
+### Hipótese
+### Testes e evidências
+### Causa
+### Correção
+### Validação
+~~~
