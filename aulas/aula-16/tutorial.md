@@ -100,10 +100,17 @@ sudo apt update
 sudo apt install -y lftp netcat-openbsd
 ~~~
 
-Confira as ferramentas:
+Confira separadamente.
+
+No servidor:
 
 ~~~bash
 vsftpd -v
+~~~
+
+No cliente:
+
+~~~bash
 lftp --version
 ~~~
 
@@ -150,7 +157,8 @@ sudo chmod 750 /srv/ftp/ftpuser/arquivos
 Crie um arquivo para download:
 
 ~~~bash
-sudo -u ftpuser sh -c   'echo "Arquivo disponibilizado pelo servidor FTP" > /srv/ftp/ftpuser/arquivos/servidor.txt'
+sudo -u ftpuser sh -c \
+  'echo "Arquivo disponibilizado pelo servidor FTP" > /srv/ftp/ftpuser/arquivos/servidor.txt'
 ~~~
 
 Confira:
@@ -544,8 +552,10 @@ transferencia/aula-16/
 Copie a configuração:
 
 ~~~bash
-sudo cp /etc/vsftpd.conf ~/vsftpd-aula16.conf
+sudo cat /etc/vsftpd.conf > ~/vsftpd-aula16.conf
 ~~~
+
+O arquivo criado em sua home pertencerá ao seu usuário, facilitando a inclusão no portfólio.
 
 Depois leve o arquivo ao seu portfólio conforme o fluxo já utilizado na disciplina.
 
